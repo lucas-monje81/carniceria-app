@@ -37,7 +37,6 @@ def init_db():
         )
     ''')
 
-    # Tabla de usuarios con fecha de vencimiento de licencia (YYYY-MM-DD)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,11 +49,36 @@ def init_db():
         )
     ''')
 
-    # Crear el administrador principal si no existe (vencimiento lejano y es_admin=1)
+    # Crear administrador por defecto si no existe
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
                        ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
+
+    # Precargar cortes estándar si la tabla está vacía
+    cursor.execute("SELECT COUNT(*) FROM cortes")
+    if cursor.fetchone()[0] == 0:
+        cortes_iniciales = [
+            ("MATAMBRE", 1.495, 20000, 0, 0),
+            ("PALETA", 3.855, 14500, 22000, 1),
+            ("FALDA", 5.020, 7500, 13000, 0),
+            ("COSTILLA / ASADO", 7.095, 14000, 23000, 1),
+            ("COSTELETA", 7.470, 14000, 20000, 0),
+            ("VACIO", 2.445, 14000, 23000, 0),
+            ("TAPA DE ASADO", 1.710, 14000, 23000, 0),
+            ("PUCHERO ESPECIAL", 5.140, 8500, 11000, 0),
+            ("PUCHERO COMUN", 4.325, 6500, 7900, 0),
+            ("GRASA", 6.885, 3500, 3500, 0),
+            ("MOLIDA ESPECIAL", 5.670, 14500, 22000, 1),
+            ("MOLIDA COMUN", 4.725, 7900, 11000, 0),
+            ("BLANDO ESPECIAL", 10.035, 16000, 26000, 0),
+            ("LOMO", 1.520, 17000, 26000, 0),
+            ("CUADRIL", 2.935, 17000, 26000, 0),
+            ("PECETO", 1.505, 17000, 26000, 0),
+            ("AGUJAS", 8.580, 7500, 13000, 0),
+            ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
+        ]
+        cursor.executemany("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)", cortes_iniciales)
 
     conn.commit()
     conn.close()
@@ -78,10 +102,9 @@ def login():
             if activo == 0:
                 error = 'Su cuenta se encuentra desactivada. Comuníquese con soporte.'
             elif not es_admin and vencimiento:
-                # Validar si la licencia expiró
                 hoy = datetime.now().strftime('%Y-%m-%d')
                 if hoy > vencimiento:
-                    error = f'Su licencia venció el {vencimiento}. Renueve su suscripción para continuar.'
+                    error = f'Su licencia venció el {vencimiento}. Renueve su suscripción.'
                 else:
                     session['user_id'] = user_id
                     session['username'] = uname
@@ -89,7 +112,6 @@ def login():
                     session['es_admin'] = es_admin
                     return redirect(url_for('index'))
             else:
-                # Si es admin o no tiene límite de fecha
                 session['user_id'] = user_id
                 session['username'] = uname
                 session['negocio'] = negocio
@@ -102,7 +124,6 @@ def login():
 
 @app.route('/admin/licencias')
 def admin_licencias():
-    # Solo el admin puede entrar a este panel oculto
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
         
