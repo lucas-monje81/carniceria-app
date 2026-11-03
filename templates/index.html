@@ -890,4 +890,24 @@
 
         if(!nombre) { alert('Por favor ingresa el nombre del corte'); return; }
 
-        cortesData.push({ nombre: nombre.toUpperCase(), kilos: kilos, precio_hist: precioHist, precio_mod: 0, oferta:
+        cortesData.push({ nombre: nombre.toUpperCase(), kilos: kilos, precio_hist: precioHist, precio_mod: 0, oferta: 0 });
+        document.getElementById('nuevoNombre').value = '';
+        document.getElementById('nuevoKilos').value = '';
+        document.getElementById('nuevoPrecioHist').value = '';
+        renderizarTablaAdmin();
+        guardarTodoEnServidor();
+        alert('Corte agregado con éxito');
+    }
+
+    function eliminarCorte(index) {
+        if(confirm('¿Seguro querés eliminar este corte?')) {
+            cortesData.splice(index, 1);
+            renderizarTablaAdmin();
+            guardarTodoEnServidor();
+        }
+    }
+
+    window.onload = function() { cargarDatosDesdeServidor(); };
+</script>
+</body>
+</html>
