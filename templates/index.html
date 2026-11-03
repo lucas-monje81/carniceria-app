@@ -1,4 +1,303 @@
-<aside>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión - Carnicería</title>
+    <style>
+        :root {
+            --primary: #991b1b;
+            --primary-dark: #7f1d1d;
+            --sidebar-bg: #1f2937;
+            --sidebar-hover: #374151;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        aside {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: #111827;
+            border-bottom: 1px solid #374151;
+            text-align: center;
+        }
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .sidebar-menu li {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #374151;
+            transition: background 0.2s;
+            font-size: 0.95rem;
+        }
+        .sidebar-menu li:hover, .sidebar-menu li.active {
+            background-color: var(--sidebar-hover);
+            border-left: 5px solid var(--primary);
+        }
+        .sidebar-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #374151;
+            background-color: #111827;
+        }
+        .btn-logout {
+            display: block;
+            width: 100%;
+            background-color: #dc2626;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover {
+            background-color: #b91c1c;
+        }
+        main {
+            flex-grow: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .view-section {
+            display: none;
+        }
+        .view-section.active {
+            display: block;
+        }
+        h2 {
+            color: var(--primary);
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+        }
+        .card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        .badge-real {
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 6px 10px;
+            background: #f0fdf4;
+            color: #047857;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .table-container {
+            max-height: 420px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #f9fafb;
+            color: var(--text-muted);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: inset 0 -2px 0 var(--border);
+        }
+        td input.input-centrado {
+            width: 110px;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            text-align: center;
+        }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .summary-box {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .stat-card p {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: var(--primary-dark);
+        }
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+        .btn-danger { background-color: #dc2626; padding: 5px 10px; font-size: 0.8rem; }
+        .btn-warning { background-color: #d97706; color: white; }
+        .btn-warning:hover { background-color: #b45309; }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; height: auto; overflow: auto; }
+            aside { width: 100%; height: auto; }
+            .sidebar-menu { display: flex; flex-wrap: wrap; overflow-x: auto; }
+            .sidebar-menu li { flex: 1 1 auto; text-align: center; padding: 10px; font-size: 0.85rem; border: none; border-right: 1px solid #374151; }
+            main { height: auto; overflow-y: visible; padding: 15px; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+
+        .logo-img-grande {
+            max-height: 85px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+
+        .header-con-logo-centrado {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            text-align: left;
+            margin: 0 auto 10px auto;
+        }
+
+        .cartel-a4 {
+            background: white;
+            border: 6px solid #991b1b;
+            border-radius: 20px;
+            padding: 30px 25px;
+            width: 100%;
+            max-width: 600px;
+            height: 72vh;
+            margin: 0 auto 30px auto;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            page-break-after: always;
+            page-break-inside: avoid;
+        }
+
+        @media print {
+            @page { size: portrait; margin: 0; }
+            body * { visibility: hidden; }
+            aside, .sidebar-header, .sidebar-menu, .no-print { display: none !important; }
+            .printable-area, .printable-area * { visibility: visible; }
+            .printable-area { position: absolute; left: 0; top: 0; width: 100vw; margin: 0; padding: 0; }
+            .cartel-a4 {
+                page-break-after: always; page-break-inside: avoid; height: 100vh; width: 100vw; max-width: none;
+                border: none; border-radius: 0; margin: 0; padding: 0; display: flex; flex-direction: column;
+                justify-content: center; align-items: center; background: white;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .cartel-contenido-interno {
+                border: 7px solid #991b1b; border-radius: 24px; width: 88vw; max-width: 680px; padding: 35px 30px;
+                box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; background: white;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .logo-print { max-height: 90px !important; max-width: 190px !important; object-fit: contain; }
+            .header-con-logo { justify-content: center; gap: 20px; text-align: left; width: 100%; margin-bottom: 5px; }
+            .empresa-txt { font-size: 1.4rem !important; letter-spacing: 1px !important; }
+            .badge-oferta-print { background-color: #991b1b !important; color: white !important; padding: 10px 40px !important; font-size: 2.2rem !important; letter-spacing: 2px !important; }
+            .corte-txt { font-size: 4rem !important; }
+            .precio-txt { font-size: 5.5rem !important; }
+            .kg-txt { font-size: 2rem !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
         <div class="sidebar-header">🥩 Carnicería App</div>
         <ul class="sidebar-menu">
             <li id="menu-precios" class="active" onclick="cambiarVista('precios')">📊 Precios</li>
@@ -10,4 +309,605 @@
             <li onclick="window.location.href='/admin/licencias'" style="background-color: #7f1d1d; border-top: 1px solid #374151; font-weight: bold;">🔑 Licencias (Admin)</li>
             {% endif %}
         </ul>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="btn-logout">🚪 Cerrar Sesión</a>
+        </div>
     </aside>
+
+    <main>
+        <section id="view-precios" class="view-section active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h2 style="margin: 0;">Panel de Precios y Costos</h2>
+                <button class="btn btn-warning" onclick="limpiarOfertasYPreciosModificados()">🧹 Limpiar Ofertas y Modificaciones</button>
+            </div>
+            
+            <div class="card">
+                <h3>1. Parámetros Generales</h3>
+                <div class="config-grid">
+                    <div class="input-group">
+                        <label>Precio Media Res ($ / kg)</label>
+                        <input type="text" id="precioMediaRes" value="10.000" oninput="calcular(); guardarTodoEnServidor();" onblur="formatearInputMonedaGeneral(this)">
+                    </div>
+                    <div class="input-group">
+                        <label>Margen Deseado General (%)</label>
+                        <input type="number" id="margenDeseadoGen" value="40" oninput="calcular(); guardarTodoEnServidor();">
+                    </div>
+                    <div class="input-group">
+                        <label>Margen Real Global (%)</label>
+                        <div id="lblMargenRealGlobal" class="badge-real">0.0%</div>
+                    </div>
+                    <div class="input-group">
+                        <label>Medias Reses por Semana</label>
+                        <input type="number" id="cantSemanal" value="16" oninput="calcular(); guardarTodoEnServidor();">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>2. Detalle de Cortes y Márgenes</h3>
+                <div class="table-container">
+                    <table id="tablaCortes">
+                        <thead>
+                            <tr>
+                                <th>Corte</th>
+                                <th class="text-center">Oferta ⭐</th>
+                                <th class="text-right">Costo Calc. ($/kg)</th>
+                                <th class="text-right">Precio Sugerido ($)</th>
+                                <th class="text-center">Modificar Precio ($)</th>
+                                <th class="text-right" style="color: var(--primary);">Precio Final Venta ($)</th>
+                                <th class="text-right">Margen Real (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTabla"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>3. Resumen de Rentabilidad</h3>
+                <div class="summary-box">
+                    <div class="stat-card"><h3>Costo Total 1/2 Res</h3><p id="lblCostoTotal">$0</p></div>
+                    <div class="stat-card"><h3>Venta Total 1/2 Res (Real)</h3><p id="lblVentaTotal">$0</p></div>
+                    <div class="stat-card"><h3>Ganancia Semanal</h3><p id="lblGananciaSemanal" style="color: #047857;">$0</p></div>
+                    <div class="stat-card"><h3>Ganancia Mensual (x4 sem)</h3><p id="lblGananciaMensual" style="color: #047857;">$0</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-desposte" class="view-section">
+            <h2>Configuración de Desposte y Estructura Base</h2>
+            <div class="card" style="background-color: #fef2f2; border-left: 4px solid var(--primary);">
+                <h3>Control de Kilos y Merma del Desposte</h3>
+                <div class="summary-box" style="margin-top: 10px;">
+                    <div class="stat-card" style="background: white;"><h3>Total Kilos Cortes</h3><p id="lblTotalKilosCortes">0 kg</p></div>
+                    <div class="stat-card" style="background: white;"><h3>Kilos Media Res</h3><input type="number" id="kilosMediaRes" value="92" step="0.001" oninput="actualizarResumenMerma(); guardarTodoEnServidor();" style="width: 100%; padding: 6px; font-size: 1rem; font-weight: bold; text-align: right; border: 1px solid var(--border); border-radius: 4px;"></div>
+                    <div class="stat-card" style="background: white;"><h3>Merma</h3><p id="lblMermaKg" style="color: #dc2626;">0 kg (0%)</p></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Agregar Nuevo Corte</h3>
+                <div class="form-row">
+                    <div class="input-group"><label>Nombre</label><input type="text" id="nuevoNombre" placeholder="Ej: LOMO"></div>
+                    <div class="input-group"><label>Kilos</label><input type="number" id="nuevoKilos" step="0.001" placeholder="1.5"></div>
+                    <div class="input-group"><label>Precio Histórico ($)</label><input type="text" id="nuevoPrecioHist" placeholder="17.000" onblur="formatearInputSimple(this)"></div>
+                    <button class="btn" onclick="agregarCorte()">+ Agregar</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Cortes Registrados</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Corte</th>
+                                <th class="text-right">Kilos</th>
+                                <th class="text-right">Precio Histórico ($)</th>
+                                <th class="text-right">Estructura (%)</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTablaAdmin"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-lista" class="view-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" class="no-print">
+                <h2>Lista de Precios Oficial</h2>
+                <button class="btn" onclick="window.print()">🖨️ Imprimir Lista</button>
+            </div>
+            <div class="card printable-area" style="background: white; padding: 30px; max-width: 800px; margin: 0 auto;">
+                <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--primary); padding-bottom: 15px;">
+                    <div id="contenedorLogoLista" style="display: none; margin-bottom: 5px;">
+                        <div class="header-con-logo-centrado">
+                            <img id="logoListaImg" src="" alt="Logo" class="logo-img-grande">
+                            <div>
+                                <h1 id="empresaNombre" style="margin: 0; color: var(--primary); font-size: 2rem;">CARNICERÍA</h1>
+                                <p id="empresaDatos" style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 1rem;">Dirección | Teléfono</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="contenedorSinLogoLista">
+                        <h1 id="empresaNombreAlternativo" style="margin: 0; color: var(--primary); font-size: 2rem;">CARNICERÍA</h1>
+                        <p id="empresaDatosAlternativo" style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 1rem;">Dirección | Teléfono</p>
+                    </div>
+                    <h3 style="margin: 15px 0 0 0; color: #1f2937; text-transform: uppercase; font-size: 1.1rem;">Lista de Precios Oficial</h3>
+                </div>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="background: #f3f4f6; color: #1f2937; font-size: 1rem; padding: 12px;">Corte</th>
+                            <th class="text-right" style="background: #f3f4f6; color: var(--primary); font-size: 1rem; padding: 12px;">Precio Venta ($ / kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoListaPrecios"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="view-ofertas" class="view-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" class="no-print">
+                <h2>Carteles de Oferta para Imprimir (Tamaño A4)</h2>
+                <button class="btn" onclick="window.print()">🖨️ Imprimir Carteles</button>
+            </div>
+            <div id="contenedorCartelesA4" class="printable-area"></div>
+        </section>
+
+        <section id="view-empresa" class="view-section">
+            <h2>Datos de la Empresa / Negocio</h2>
+            <div class="card">
+                <div class="config-grid" style="grid-template-columns: 1fr; gap: 15px;">
+                    <div class="input-group">
+                        <label>Nombre del Negocio / Empresa</label>
+                        <input type="text" id="cfgEmpresaNombre" value="CARNICERÍA LA ESPERANZA" oninput="guardarDatosEmpresa(); guardarTodoEnServidor();">
+                    </div>
+                    <div class="input-group">
+                        <label>Datos de Contacto (Dirección, Teléfono, etc.)</label>
+                        <input type="text" id="cfgEmpresaDatos" value="Av. San Martín 1234 - Tel: 351-1234567" oninput="guardarDatosEmpresa(); guardarTodoEnServidor();">
+                    </div>
+                    <div class="input-group">
+                        <label>Logo del Negocio (Imagen)</label>
+                        <input type="file" id="cfgEmpresaLogoFile" accept="image/*" onchange="subirLogo(event)">
+                        <div style="margin-top: 10px;">
+                            <img id="cfgLogoPreview" src="" alt="Logo actual" style="max-height: 100px; object-fit: contain; display: none; border: 1px solid var(--border); padding: 5px; border-radius: 6px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+<script>
+    let cortesData = [];
+    let logoUrlGlobal = "";
+
+    function cargarDatosDesdeServidor() {
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.cortes && data.cortes.length > 0) {
+                    cortesData = data.cortes;
+                } else {
+                    cortesData = [
+                        {nombre: "MATAMBRE", kilos: 1.495, precio_hist: 20000, precio_mod: 0, oferta: 0},
+                        {nombre: "PALETA", kilos: 3.855, precio_hist: 14500, precio_mod: 22000, oferta: 1},
+                        {nombre: "FALDA", kilos: 5.020, precio_hist: 7500, precio_mod: 13000, oferta: 0},
+                        {nombre: "COSTILLA / ASADO", kilos: 7.095, precio_hist: 14000, precio_mod: 23000, oferta: 1},
+                        {nombre: "COSTELETA", kilos: 7.470, precio_hist: 14000, precio_mod: 20000, oferta: 0},
+                        {nombre: "VACIO", kilos: 2.445, precio_hist: 14000, precio_mod: 23000, oferta: 0},
+                        {nombre: "TAPA DE ASADO", kilos: 1.710, precio_hist: 14000, precio_mod: 23000, oferta: 0},
+                        {nombre: "PUCHERO ESPECIAL", kilos: 5.140, precio_hist: 8500, precio_mod: 11000, oferta: 0},
+                        {nombre: "PUCHERO COMUN", kilos: 4.325, precio_hist: 6500, precio_mod: 7900, oferta: 0},
+                        {nombre: "GRASA", kilos: 6.885, precio_hist: 3500, precio_mod: 3500, oferta: 0},
+                        {nombre: "MOLIDA ESPECIAL", kilos: 5.670, precio_hist: 14500, precio_mod: 22000, oferta: 1},
+                        {nombre: "MOLIDA COMUN", kilos: 4.725, precio_hist: 7900, precio_mod: 11000, oferta: 0},
+                        {nombre: "BLANDO ESPECIAL", kilos: 10.035, precio_hist: 16000, precio_mod: 26000, oferta: 0},
+                        {nombre: "LOMO", kilos: 1.520, precio_hist: 17000, precio_mod: 26000, oferta: 0},
+                        {nombre: "CUADRIL", kilos: 2.935, precio_hist: 17000, precio_mod: 26000, oferta: 0},
+                        {nombre: "PECETO", kilos: 1.505, precio_hist: 17000, precio_mod: 26000, oferta: 0},
+                        {nombre: "AGUJAS", kilos: 8.580, precio_hist: 7500, precio_mod: 13000, oferta: 0},
+                        {nombre: "TAPA CUADRIL", kilos: 0.920, precio_hist: 16000, precio_mod: 26000, oferta: 0}
+                    ];
+                }
+                if (data.params) {
+                    if(data.params.precio_media_res) document.getElementById('precioMediaRes').value = data.params.precio_media_res;
+                    if(data.params.kilos_media_res) document.getElementById('kilosMediaRes').value = data.params.kilos_media_res;
+                    if(data.params.margen_deseado) document.getElementById('margenDeseadoGen').value = data.params.margen_deseado;
+                    if(data.params.cant_semanal) document.getElementById('cantSemanal').value = data.params.cant_semanal;
+                }
+                if (data.empresa) {
+                    if(data.empresa.nombre) document.getElementById('cfgEmpresaNombre').value = data.empresa.nombre;
+                    if(data.empresa.datos) document.getElementById('cfgEmpresaDatos').value = data.empresa.datos;
+                    if(data.empresa.logo) {
+                        logoUrlGlobal = data.empresa.logo;
+                        let preview = document.getElementById('cfgLogoPreview');
+                        if (preview) {
+                            preview.src = logoUrlGlobal;
+                            preview.style.display = 'block';
+                        }
+                    }
+                }
+                actualizarCabeceraEmpresa();
+                renderizarTablaPrecios();
+            })
+            .catch(err => console.error("Error al cargar datos:", err));
+    }
+
+    function subirLogo(event) {
+        let file = event.target.files[0];
+        if (!file) return;
+
+        let formData = new FormData();
+        formData.append('logo', file);
+
+        fetch('/api/upload-logo', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                logoUrlGlobal = data.logo;
+                let preview = document.getElementById('cfgLogoPreview');
+                preview.src = logoUrlGlobal;
+                preview.style.display = 'block';
+                alert('¡Logo subido con éxito!');
+                actualizarCabeceraEmpresa();
+            } else {
+                alert('Error al subir el logo.');
+            }
+        })
+        .catch(err => console.error("Error:", err));
+    }
+
+    function guardarTodoEnServidor() {
+        const payload = {
+            params: {
+                precioMediaRes: document.getElementById('precioMediaRes').value,
+                kilosMediaRes: document.getElementById('kilosMediaRes').value,
+                margenDeseadoGen: document.getElementById('margenDeseadoGen').value,
+                cantSemanal: document.getElementById('cantSemanal').value
+            },
+            empresa: {
+                nombre: document.getElementById('cfgEmpresaNombre').value,
+                datos: document.getElementById('cfgEmpresaDatos').value,
+                logo: logoUrlGlobal
+            },
+            cortes: cortesData
+        };
+
+        fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error("Error al guardar:", err));
+    }
+
+    function limpiarOfertasYPreciosModificados() {
+        if (confirm("¿Estás seguro de que querés desmarcar todas las ofertas y borrar los precios modificados?")) {
+            cortesData.forEach(corte => {
+                corte.oferta = 0;
+                corte.precio_mod = 0;
+            });
+            renderizarTablaPrecios();
+            guardarTodoEnServidor();
+            alert("¡Se han limpiado todas las ofertas y modificaciones con éxito!");
+        }
+    }
+
+    function limpiarNumero(val) {
+        if (!val) return 0;
+        return parseFloat(val.toString().replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    function formatearInputMonedaGeneral(input) {
+        let val = limpiarNumero(input.value);
+        if (val > 0) { input.value = Math.round(val).toLocaleString('es-AR'); } else { input.value = ''; }
+        calcular();
+        guardarTodoEnServidor();
+    }
+
+    function formatearInputSimple(input) {
+        let val = limpiarNumero(input.value);
+        if (val > 0) { input.value = Math.round(val).toLocaleString('es-AR'); } else { input.value = ''; }
+    }
+
+    function guardarDatosEmpresa() { actualizarCabeceraEmpresa(); }
+
+    function actualizarCabeceraEmpresa() {
+        let nombre = document.getElementById('cfgEmpresaNombre').value;
+        let datos = document.getElementById('cfgEmpresaDatos').value;
+        
+        let elNombre = document.getElementById('empresaNombre');
+        let elDatos = document.getElementById('empresaDatos');
+        let elNombreAlt = document.getElementById('empresaNombreAlternativo');
+        let elDatosAlt = document.getElementById('empresaDatosAlternativo');
+        
+        if (elNombre) elNombre.innerText = nombre;
+        if (elDatos) elDatos.innerText = datos;
+        if (elNombreAlt) elNombreAlt.innerText = nombre;
+        if (elDatosAlt) elDatosAlt.innerText = datos;
+
+        let contenedorLogoLista = document.getElementById('contenedorLogoLista');
+        let contenedorSinLogoLista = document.getElementById('contenedorSinLogoLista');
+        let logoListaImg = document.getElementById('logoListaImg');
+
+        if (logoUrlGlobal) {
+            logoListaImg.src = logoUrlGlobal;
+            contenedorLogoLista.style.display = 'block';
+            contenedorSinLogoLista.style.display = 'none';
+        } else {
+            contenedorLogoLista.style.display = 'none';
+            contenedorSinLogoLista.style.display = 'block';
+        }
+    }
+
+    function cambiarVista(vista) {
+        document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+        document.querySelectorAll('.sidebar-menu li').forEach(li => li.classList.remove('active'));
+
+        document.getElementById(`view-${vista}`).classList.add('active');
+        document.getElementById(`menu-${vista}`).classList.add('active');
+        
+        if(vista === 'desposte') { renderizarTablaAdmin(); }
+        else if(vista === 'precios') { renderizarTablaPrecios(); calcular(); }
+        else if(vista === 'lista') { renderizarListaPrecios(); }
+        else if(vista === 'ofertas') { renderizarCartelesOferta(); }
+    }
+
+    function formatearMoneda(val) { return '$ ' + Math.round(val).toLocaleString('es-AR'); }
+
+    function calcularEstructuras() {
+        let sumaTotalHistorica = 0;
+        cortesData.forEach(corte => { sumaTotalHistorica += (corte.kilos * corte.precio_hist); });
+        cortesData.forEach(corte => {
+            let valorCorte = corte.kilos * corte.precio_hist;
+            corte.estructura = sumaTotalHistorica > 0 ? (valorCorte / sumaTotalHistorica) * 100 : 0;
+        });
+    }
+
+    function obtenerKilosTotalesCortes() {
+        let total = 0;
+        cortesData.forEach(corte => { total += corte.kilos; });
+        return total;
+    }
+
+    function actualizarResumenMerma() {
+        let totalKilosCortes = obtenerKilosTotalesCortes();
+        const kilosMediaRes = parseFloat(document.getElementById('kilosMediaRes').value) || 0;
+        let diferenciaMerma = kilosMediaRes - totalKilosCortes;
+        let porcentajeMerma = kilosMediaRes > 0 ? (diferenciaMerma / kilosMediaRes) * 100 : 0;
+
+        document.getElementById('lblTotalKilosCortes').innerText = totalKilosCortes.toFixed(3) + ' kg';
+        document.getElementById('lblMermaKg').innerText = diferenciaMerma.toFixed(3) + ' kg (' + porcentajeMerma.toFixed(2) + '%)';
+    }
+
+    function renderizarTablaPrecios() {
+        let tbody = document.getElementById('cuerpoTabla');
+        tbody.innerHTML = '';
+        cortesData.forEach((corte, index) => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${corte.nombre}</strong></td>
+                <td class="text-center"><input type="checkbox" ${corte.oferta == 1 ? 'checked' : ''} onchange="toggleOferta(${index}, this)"></td>
+                <td class="text-right" id="costo_${index}">$0</td>
+                <td class="text-right" style="color: #4b5563;" id="sugerido_${index}">$0</td>
+                <td class="text-center">
+                    <input type="text" class="input-centrado" id="precio_mod_${index}" 
+                           value="${corte.precio_mod > 0 ? Math.round(corte.precio_mod).toLocaleString('es-AR') : ''}" 
+                           oninput="calcular(); guardarTodoEnServidor();" onblur="formatearInputMod(${index}, this)">
+                </td>
+                <td class="text-right" style="font-weight: bold; color: var(--primary);" id="final_${index}">$0</td>
+                <td class="text-right" style="font-weight: bold;" id="margen_${index}">0.0%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        calcular();
+    }
+
+    function toggleOferta(index, checkbox) {
+        cortesData[index].oferta = checkbox.checked ? 1 : 0;
+        guardarTodoEnServidor();
+    }
+
+    function formatearInputMod(index, input) {
+        let val = limpiarNumero(input.value);
+        if (val > 0) {
+            input.value = Math.round(val).toLocaleString('es-AR');
+            cortesData[index].precio_mod = val;
+        } else {
+            input.value = '';
+            cortesData[index].precio_mod = 0;
+        }
+        guardarTodoEnServidor();
+        calcular();
+    }
+
+    function calcular() {
+        calcularEstructuras();
+        const precioMediaRes = limpiarNumero(document.getElementById('precioMediaRes').value);
+        const kilosMediaRes = parseFloat(document.getElementById('kilosMediaRes').value) || 1;
+        const margenGen = (parseFloat(document.getElementById('margenDeseadoGen').value) || 0) / 100;
+        const cantSemanal = parseFloat(document.getElementById('cantSemanal').value) || 0;
+
+        const costoTotalMediaRes = precioMediaRes * kilosMediaRes;
+        let ventaTotalMediaRes = 0;
+        let costoTotalAcumuladoCortes = 0;
+
+        cortesData.forEach((corte, index) => {
+            let costoTotalCorte = costoTotalMediaRes * (corte.estructura / 100);
+            let costoUnitario = corte.kilos > 0 ? costoTotalCorte / corte.kilos : 0;
+            let precioSugerido = costoUnitario * (1 + margenGen);
+
+            let inputMod = document.getElementById(`precio_mod_${index}`);
+            let precioMod = inputMod ? limpiarNumero(inputMod.value) : (corte.precio_mod || 0);
+            cortesData[index].precio_mod = precioMod;
+
+            let precioFinalVenta = precioMod > 0 ? precioMod : precioSugerido;
+            corte.precioFinalCache = precioFinalVenta;
+
+            let margenRealCorte = 0;
+            if (costoUnitario > 0) {
+                margenRealCorte = ((precioFinalVenta - costoUnitario) / costoUnitario) * 100;
+            }
+
+            ventaTotalMediaRes += precioFinalVenta * corte.kilos;
+            costoTotalAcumuladoCortes += costoTotalCorte;
+
+            let lblCosto = document.getElementById(`costo_${index}`);
+            let lblSugerido = document.getElementById(`sugerido_${index}`);
+            let lblFinal = document.getElementById(`final_${index}`);
+            let lblMargen = document.getElementById(`margen_${index}`);
+
+            if (lblCosto) lblCosto.innerText = formatearMoneda(costoUnitario);
+            if (lblSugerido) lblSugerido.innerText = formatearMoneda(precioSugerido);
+            if (lblFinal) lblFinal.innerText = formatearMoneda(precioFinalVenta);
+            if (lblMargen) {
+                lblMargen.innerText = margenRealCorte.toFixed(1) + '%';
+                lblMargen.style.color = margenRealCorte >= 0 ? '#047857' : '#dc2626';
+            }
+        });
+
+        let margenRealGlobal = costoTotalAcumuladoCortes > 0 ? ((ventaTotalMediaRes - costoTotalAcumuladoCortes) / costoTotalAcumuladoCortes) * 100 : 0;
+        let lblMargenGlobal = document.getElementById('lblMargenRealGlobal');
+        if (lblMargenGlobal) {
+            lblMargenGlobal.innerText = margenRealGlobal.toFixed(1) + '%';
+            lblMargenGlobal.style.color = margenRealGlobal >= (margenGen * 100) ? '#047857' : '#dc2626';
+        }
+
+        let gananciaMediaRes = ventaTotalMediaRes - costoTotalMediaRes;
+        let gananciaSemanal = gananciaMediaRes * cantSemanal;
+        let gananciaMensual = gananciaSemanal * 4;
+
+        if (document.getElementById('lblCostoTotal')) document.getElementById('lblCostoTotal').innerText = formatearMoneda(costoTotalMediaRes);
+        if (document.getElementById('lblVentaTotal')) document.getElementById('lblVentaTotal').innerText = formatearMoneda(ventaTotalMediaRes);
+        if (document.getElementById('lblGananciaSemanal')) document.getElementById('lblGananciaSemanal').innerText = formatearMoneda(gananciaSemanal);
+        if (document.getElementById('lblGananciaMensual')) document.getElementById('lblGananciaMensual').innerText = formatearMoneda(gananciaMensual);
+    }
+
+    function renderizarListaPrecios() {
+        calcular();
+        actualizarCabeceraEmpresa();
+        let tbody = document.getElementById('cuerpoListaPrecios');
+        tbody.innerHTML = '';
+        cortesData.forEach(corte => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 12px 16px; border-bottom: 1px solid var(--border);"><strong>${corte.nombre}</strong></td>
+                <td class="text-right" style="padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--primary);">${formatearMoneda(corte.precioFinalCache || 0)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderizarCartelesOferta() {
+        calcular();
+        let contenedor = document.getElementById('contenedorCartelesA4');
+        contenedor.innerHTML = '';
+        
+        let ofertas = cortesData.filter(c => c.oferta == 1);
+        if (ofertas.length === 0) {
+            contenedor.innerHTML = `<div class="card" style="text-align: center; color: var(--text-muted); padding: 30px;">No hay cortes marcados como oferta. Volvé a "Precios" y tildá la estrella en los cortes que quieras destacar.</div>`;
+            return;
+        }
+
+        let empresaNombre = document.getElementById('cfgEmpresaNombre').value;
+        let empresaDatos = document.getElementById('cfgEmpresaDatos').value;
+
+        ofertas.forEach(corte => {
+            let div = document.createElement('div');
+            div.className = 'cartel-a4';
+            
+            let headerCardHtml = "";
+            if (logoUrlGlobal) {
+                headerCardHtml = `
+                    <div class="header-con-logo-centrado">
+                        <img src="${logoUrlGlobal}" class="logo-print logo-img-grande" alt="Logo">
+                        <div>
+                            <div class="empresa-txt" style="font-size: 1.4rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
+                            <div style="font-size: 0.85rem; color: #6b7280; margin-top: 2px;">${empresaDatos}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                headerCardHtml = `
+                    <div style="text-align: center; width: 100%; margin-bottom: 10px;">
+                        <div class="empresa-txt" style="font-size: 1.5rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
+                        <div style="font-size: 0.9rem; color: #6b7280;">${empresaDatos}</div>
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <div class="cartel-contenido-interno">
+                    ${headerCardHtml}
+                    <div class="badge-oferta-print" style="background: #991b1b; color: white; padding: 10px 35px; border-radius: 50px; font-size: 2.2rem; font-weight: bold; display: inline-block; letter-spacing: 2px;">¡OFERTA!</div>
+                    <div class="corte-txt" style="font-size: 4rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 0; line-height: 1.1;">${corte.nombre}</div>
+                    <div class="precio-txt" style="font-size: 5.5rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 12px 0; width: 100%;">${formatearMoneda(corte.precioFinalCache || 0)} <span class="kg-txt" style="font-size: 2rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
+                </div>
+            `;
+            contenedor.appendChild(div);
+        });
+    }
+
+    function renderizarTablaAdmin() {
+        calcularEstructuras();
+        actualizarResumenMerma();
+        let tbody = document.getElementById('cuerpoTablaAdmin');
+        tbody.innerHTML = '';
+        cortesData.forEach((corte, index) => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${corte.nombre}</strong></td>
+                <td class="text-right"><input type="number" step="0.001" value="${corte.kilos}" onchange="actualizarCorte(${index}, 'kilos', this.value)"></td>
+                <td class="text-right"><input type="text" value="${Math.round(corte.precio_hist).toLocaleString('es-AR')}" onblur="actualizarPrecioHist(${index}, this.value)"></td>
+                <td class="text-right" style="font-weight: bold; color: #2563eb;">${corte.estructura.toFixed(2)}%</td>
+                <td class="text-center"><button class="btn btn-danger" onclick="eliminarCorte(${index})">Eliminar</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function actualizarCorte(index, campo, valor) {
+        cortesData[index][campo] = parseFloat(valor) || 0;
+        calcularEstructuras();
+        actualizarResumenMerma();
+        guardarTodoEnServidor();
+    }
+
+    function actualizarPrecioHist(index, valor) {
+        let limpio = limpiarNumero(valor);
+        cortesData[index].precio_hist = limpio;
+        calcularEstructuras();
+        renderizarTablaAdmin();
+        guardarTodoEnServidor();
+    }
+
+    function agregarCorte() {
+        let nombre = document.getElementById('nuevoNombre').value.trim();
+        let kilos = parseFloat(document.getElementById('nuevoKilos').value) || 0;
+        let precioHist = limpiarNumero(document.getElementById('nuevoPrecioHist').value);
+
+        if(!nombre) { alert('Por favor ingresa el nombre del corte'); return; }
+
+        cortesData.push({ nombre: nombre.toUpperCase(), kilos: kilos, precio_hist: precioHist, precio_mod: 0, oferta: 0 });
+        document.getElementById('nuevoNombre').value = '';
+        document.getElementById('nuevoKilos').value = '';
+        document.getElementById('nuevoPrecioHist').value = '';
+        renderizarTablaAdmin();
+        guardarTodoEnServidor();
+        alert('Corte agregado con éxito');
+    }
+
+    function eliminarCorte(index) {
+        if(confirm('¿Seguro querés eliminar este corte?')) {
+            cortesData.splice(index, 1);
+            renderizarTablaAdmin();
+            guardarTodoEnServidor();
+        }
+    }
+
+    window.onload = function() { cargarDatosDesdeServidor(); };
+</script>
+</body>
+</html>
