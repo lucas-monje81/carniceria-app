@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from werkzeug.utils import secure_filename
-import sqlite3
+import libsql_client
 from datetime import datetime
 
 app = Flask(__name__)
@@ -11,22 +11,29 @@ UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-DB_NAME = 'carniceria.db'
+# Configuración de Turso (Podés poner tus datos acá o en las Environment Variables de Render)
+TURSO_URL = os.environ.get("TURSO_URL", "libsql://tu-base-de-datos.turso.io")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "tu_token_aqui")
+
+def get_db_connection():
+    return libsql_client.connect(
+        url=TURSO_URL,
+        auth_token=TURSO_AUTH_TOKEN
+    )
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    conn = get_db_connection()
     
-    cursor.execute('''
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
             value TEXT
         )
     ''')
     
-    cursor.execute('''
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT,
@@ -37,7 +44,7 @@ def init_db():
         )
     ''')
 
-    cursor.execute('''
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
@@ -50,14 +57,15 @@ def init_db():
     ''')
 
     # Crear administrador por defecto si no existe
-    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
-                       ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
+    res = conn.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
+    count = res.rows[0][0]
+    if count == 0:
+        conn.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
+                     ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
 
     # Precargar cortes estándar si la tabla está vacía
-    cursor.execute("SELECT COUNT(*) FROM cortes")
-    if cursor.fetchone()[0] == 0:
+    res_cortes = conn.execute("SELECT COUNT(*) FROM cortes")
+    if res_cortes.rows[0][0] == 0:
         cortes_iniciales = [
             ("MATAMBRE", 1.495, 20000, 0, 0),
             ("PALETA", 3.855, 14500, 22000, 1),
@@ -78,9 +86,9 @@ def init_db():
             ("AGUJAS", 8.580, 7500, 13000, 0),
             ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
         ]
-        cursor.executemany("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)", cortes_iniciales)
+        for c in cortes_iniciales:
+            conn.execute("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)", c)
 
-    conn.commit()
     conn.close()
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -90,10 +98,9 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", (username, password))
-        user = cursor.fetchone()
+        conn = get_db_connection()
+        res = conn.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", [username, password])
+        user = res.rows[0] if res.rows else None
         conn.close()
         
         if user:
@@ -127,10 +134,9 @@ def admin_licencias():
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
         
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
-    clientes = cursor.fetchall()
+    conn = get_db_connection()
+    res = conn.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
+    clientes = res.rows
     conn.close()
     
     return render_template('admin_licencias.html', clientes=clientes)
@@ -145,12 +151,10 @@ def crear_cliente():
     negocio = request.form['negocio']
     vencimiento = request.form['vencimiento']
     
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    conn = get_db_connection()
     try:
-        cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, 1, 0)",
-                       (username, password, negocio, vencimiento))
-        conn.commit()
+        conn.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, 1, 0)",
+                     [username, password, negocio, vencimiento])
     except Exception as e:
         print("Error al crear cliente:", e)
     conn.close()
@@ -162,10 +166,8 @@ def toggle_cliente(id):
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
         
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", (id,))
-    conn.commit()
+    conn = get_db_connection()
+    conn.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", [id])
     conn.close()
     
     return redirect(url_for('admin_licencias'))
@@ -186,19 +188,17 @@ def get_data():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    conn = get_db_connection()
     
-    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes")
-    rows = cursor.fetchall()
-    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in rows]
+    res_cortes = conn.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes")
+    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in res_cortes.rows]
     
-    cursor.execute("SELECT key, value FROM config")
-    config_rows = cursor.fetchall()
+    res_config = conn.execute("SELECT key, value FROM config")
     params = {}
     empresa = {'nombre': session.get('negocio', 'CARNICERÍA'), 'datos': 'Av. San Martín 1234 - Tel: 351-1234567', 'logo': ''}
     
-    for k, v in config_rows:
+    for r in res_config.rows:
+        k, v = r[0], r[1]
         if k == 'precio_media_res': params['precio_media_res'] = v
         elif k == 'kilos_media_res': params['kilos_media_res'] = v
         elif k == 'margen_deseado': params['margen_deseado'] = v
@@ -216,29 +216,27 @@ def save_data():
         return jsonify({'error': 'No autorizado'}), 401
         
     data = request.json
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    conn = get_db_connection()
     
     if 'params' in data:
         p = data['params']
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('precio_media_res', ?)", (p.get('precioMediaRes'),))
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('kilos_media_res', ?)", (p.get('kilosMediaRes'),))
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('margen_deseado', ?)", (p.get('margenDeseadoGen'),))
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('cant_semanal', ?)", (p.get('cantSemanal'),))
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('precio_media_res', ?)", [p.get('precioMediaRes')])
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('kilos_media_res', ?)", [p.get('kilosMediaRes')])
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('margen_deseado', ?)", [p.get('margenDeseadoGen')])
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('cant_semanal', ?)", [p.get('cantSemanal')])
         
     if 'empresa' in data:
         e = data['empresa']
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_nombre', ?)", (e.get('nombre'),))
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_datos', ?)", (e.get('datos'),))
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", (e.get('logo'),))
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_nombre', ?)", [e.get('nombre')])
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_datos', ?)", [e.get('datos')])
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", [e.get('logo')])
         
     if 'cortes' in data:
-        cursor.execute("DELETE FROM cortes")
+        conn.execute("DELETE FROM cortes")
         for c in data['cortes']:
-            cursor.execute("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)",
-                           (c.get('nombre'), c.get('kilos'), c.get('precio_hist'), c.get('precio_mod'), c.get('oferta')))
+            conn.execute("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)",
+                         [c.get('nombre'), c.get('kilos'), c.get('precio_hist'), c.get('precio_mod'), c.get('oferta')])
                            
-    conn.commit()
     conn.close()
     return jsonify({'status': 'success'})
 
@@ -258,11 +256,8 @@ def upload_logo():
         file.save(filepath)
         logo_url = f'/{filepath}'
         
-        # Guarda de forma persistente en la base de datos la ruta del logo
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", (logo_url,))
-        conn.commit()
+        conn = get_db_connection()
+        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", [logo_url])
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
