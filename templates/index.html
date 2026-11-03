@@ -236,8 +236,8 @@
         }
 
         .logo-img-grande {
-            max-height: 65px;
-            max-width: 140px;
+            max-height: 85px;
+            max-width: 180px;
             object-fit: contain;
         }
 
@@ -247,15 +247,15 @@
             justify-content: center;
             gap: 15px;
             text-align: left;
-            margin: 0 auto 5px auto;
+            margin: 0 auto 10px auto;
         }
 
-        /* Cartel A4 con margen superior más generoso para que el marco quede perfecto */
+        /* Estilo original restaurado con distribución perfecta y centrado simétrico */
         .cartel-a4 {
             background: white;
-            border: 5px solid #991b1b;
+            border: 6px solid #991b1b;
             border-radius: 20px;
-            padding: 40px 20px 25px 20px;
+            padding: 30px 25px;
             width: 190mm;
             height: 275mm;
             margin: 0 auto 20px auto;
@@ -263,7 +263,7 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            justify-content: space-around;
+            justify-content: center;
             align-items: center;
             page-break-after: always;
             page-break-inside: avoid;
@@ -778,25 +778,25 @@
                     <div class="header-con-logo-centrado">
                         <img src="${logoUrlGlobal}" class="logo-img-grande" alt="Logo">
                         <div>
-                            <div style="font-size: 1.3rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
-                            <div style="font-size: 0.8rem; color: #6b7280; margin-top: 2px;">${empresaDatos}</div>
+                            <div style="font-size: 1.4rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
+                            <div style="font-size: 0.85rem; color: #6b7280; margin-top: 2px;">${empresaDatos}</div>
                         </div>
                     </div>
                 `;
             } else {
                 headerCardHtml = `
-                    <div style="text-align: center; width: 100%; margin-bottom: 5px;">
-                        <div style="font-size: 1.4rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
-                        <div style="font-size: 0.85rem; color: #6b7280;">${empresaDatos}</div>
+                    <div style="text-align: center; width: 100%; margin-bottom: 10px;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
+                        <div style="font-size: 0.9rem; color: #6b7280;">${empresaDatos}</div>
                     </div>
                 `;
             }
 
             div.innerHTML = `
                 ${headerCardHtml}
-                <div style="background: #991b1b; color: white; padding: 8px 30px; border-radius: 50px; font-size: 2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 5px 0;">¡OFERTA!</div>
-                <div style="font-size: 3.2rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 5px 0; line-height: 1.1;">${corte.nombre}</div>
-                <div style="font-size: 4.2rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 10px 0; width: 100%; margin-top: 5px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 1.6rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
+                <div style="background: #991b1b; color: white; padding: 10px 35px; border-radius: 50px; font-size: 2.2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 15px 0;">¡OFERTA!</div>
+                <div style="font-size: 4rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 10px 0; line-height: 1.1;">${corte.nombre}</div>
+                <div style="font-size: 5.5rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 15px 0; width: 100%; margin-top: 15px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 2rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
             `;
             contenedor.appendChild(div);
         });
