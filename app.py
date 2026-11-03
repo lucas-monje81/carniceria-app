@@ -2,6 +2,7 @@ import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from werkzeug.utils import secure_filename
 import sqlite3
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_super_segura_para_sesiones'
@@ -18,7 +19,6 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Tabla de configuración y datos generales
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
@@ -26,7 +26,6 @@ def init_db():
         )
     ''')
     
-    # Tabla de cortes
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,22 +37,24 @@ def init_db():
         )
     ''')
 
-    # Tabla de usuarios para el control de acceso y comercialización
+    # Tabla de usuarios con fecha de vencimiento de licencia (YYYY-MM-DD)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
             nombre_negocio TEXT,
-            activo INTEGER DEFAULT 1
+            vencimiento TEXT,
+            activo INTEGER DEFAULT 1,
+            es_admin INTEGER DEFAULT 0
         )
     ''')
 
-    # Crear un usuario administrador por defecto si no existe
-    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    # Crear el administrador principal si no existe (vencimiento lejano y es_admin=1)
+    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, activo) VALUES (?, ?, ?, ?)",
-                       ('admin', '1234', 'CARNICERÍA LA ESPERANZA', 1))
+        cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
+                       ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
 
     conn.commit()
     conn.close()
@@ -67,19 +68,86 @@ def login():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE username = ? AND password = ? AND activo = 1", (username, password))
+        cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", (username, password))
         user = cursor.fetchone()
         conn.close()
         
         if user:
-            session['user_id'] = user[0]
-            session['username'] = user[1]
-            session['negocio'] = user[3]
-            return redirect(url_for('index'))
+            user_id, uname, negocio, vencimiento, activo, es_admin = user
+            
+            if activo == 0:
+                error = 'Su cuenta se encuentra desactivada. Comuníquese con soporte.'
+            elif not es_admin and vencimiento:
+                # Validar si la licencia expiró
+                hoy = datetime.now().strftime('%Y-%m-%d')
+                if hoy > vencimiento:
+                    error = f'Su licencia venció el {vencimiento}. Renueve su suscripción para continuar.'
+                else:
+                    session['user_id'] = user_id
+                    session['username'] = uname
+                    session['negocio'] = negocio
+                    session['es_admin'] = es_admin
+                    return redirect(url_for('index'))
+            else:
+                # Si es admin o no tiene límite de fecha
+                session['user_id'] = user_id
+                session['username'] = uname
+                session['negocio'] = negocio
+                session['es_admin'] = es_admin
+                return redirect(url_for('index'))
         else:
-            error = 'Usuario o contraseña incorrectos, o cuenta inactiva.'
+            error = 'Usuario o contraseña incorrectos.'
             
     return render_template('login.html', error=error)
+
+@app.route('/admin/licencias')
+def admin_licencias():
+    # Solo el admin puede entrar a este panel oculto
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
+    clientes = cursor.fetchall()
+    conn.close()
+    
+    return render_template('admin_licencias.html', clientes=clientes)
+
+@app.route('/admin/crear-cliente', methods=['POST'])
+def crear_cliente():
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    username = request.form['username']
+    password = request.form['password']
+    negocio = request.form['negocio']
+    vencimiento = request.form['vencimiento']
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, 1, 0)",
+                       (username, password, negocio, vencimiento))
+        conn.commit()
+    except Exception as e:
+        print("Error al crear cliente:", e)
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
+
+@app.route('/admin/toggle/<int:id>')
+def toggle_cliente(id):
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
 
 @app.route('/logout')
 def logout():
@@ -90,7 +158,7 @@ def logout():
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html')
+    return render_template('index.html', es_admin=session.get('es_admin', 0))
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
@@ -107,7 +175,7 @@ def get_data():
     cursor.execute("SELECT key, value FROM config")
     config_rows = cursor.fetchall()
     params = {}
-    empresa = {'nombre': session.get('negocio', 'CARNICERÍA LA ESPERANZA'), 'datos': 'Av. San Martín 1234 - Tel: 351-1234567', 'logo': ''}
+    empresa = {'nombre': session.get('negocio', 'CARNICERÍA'), 'datos': 'Av. San Martín 1234 - Tel: 351-1234567', 'logo': ''}
     
     for k, v in config_rows:
         if k == 'precio_media_res': params['precio_media_res'] = v
