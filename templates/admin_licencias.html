@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Licencias</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f3f4f6; margin: 0; padding: 30px; color: #1f2937; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        h2, h3 { color: #991b1b; margin-top: 0; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { background: #f9fafb; font-weight: 600; color: #6b7280; }
+        .btn { background: #991b1b; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; text-decoration: none; font-size: 0.9rem; }
+        .btn:hover { background: #7f1d1d; }
+        .btn-secondary { background: #4b5563; }
+        .btn-secondary:hover { background: #374151; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+        .badge-activo { background: #d1fae5; color: #065f46; }
+        .badge-inactivo { background: #fee2e2; color: #991b1b; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; margin-top: 15px; }
+        .input-group label { display: block; font-size: 0.8rem; font-weight: bold; color: #6b7280; margin-bottom: 3px; }
+        .input-group input { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <h2>🔑 Panel de Control de Licencias (Admin)</h2>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">← Volver al Sistema</a>
+        </div>
+
+        <h3>Agregar Nuevo Cliente (Carnicería)</h3>
+        <form action="{{ url_for('crear_cliente') }}" method="POST" class="form-grid">
+            <div class="input-group">
+                <label>Nombre del Negocio</label>
+                <input type="text" name="negocio" required placeholder="Ej: Carnicería Don Jose">
+            </div>
+            <div class="input-group">
+                <label>Usuario</label>
+                <input type="text" name="username" required placeholder="Ej: donjose">
+            </div>
+            <div class="input-group">
+                <label>Contraseña</label>
+                <input type="text" name="password" required placeholder="Clave de acceso">
+            </div>
+            <div class="input-group">
+                <label>Vencimiento Licencia</label>
+                <input type="date" name="vencimiento" required>
+            </div>
+            <button type="submit" class="btn">+ Registrar Cliente</button>
+        </form>
+
+        <h3 style="margin-top: 40px;">Listado de Clientes Activos</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Negocio</th>
+                    <th>Usuario</th>
+                    <th>Vencimiento</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clientes %}
+                <tr>
+                    <td><strong>{{ c[2] }}</strong></td>
+                    <td>{{ c[1] }}</td>
+                    <td>{{ c[3] }}</td>
+                    <td>
+                        {% if c[4] == 1 %}
+                            <span class="badge badge-activo">Activo</span>
+                        {% else %}
+                            <span class="badge badge-inactivo">Suspendido</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('toggle_cliente', id=c[0]) }}" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;">
+                            {% if c[4] == 1 %} Suspender {% else %} Activar {% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #6b7280;">No hay clientes registrados todavía.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
