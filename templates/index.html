@@ -236,8 +236,8 @@
         }
 
         .logo-img-grande {
-            max-height: 80px;
-            max-width: 160px;
+            max-height: 85px;
+            max-width: 180px;
             object-fit: contain;
         }
 
@@ -250,13 +250,16 @@
             margin: 0 auto 10px auto;
         }
 
-        /* Hoja A4 contenedora general sin borde gigante */
+        /* El marco original completo de hoja a hoja, con un respiro superior perfecto */
         .cartel-a4 {
             background: white;
+            border: 6px solid #991b1b;
+            border-radius: 20px;
+            padding: 45px 25px 30px 25px;
             width: 190mm;
             height: 275mm;
             margin: 0 auto 20px auto;
-            padding: 15mm;
+            text-align: center;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -264,22 +267,6 @@
             align-items: center;
             page-break-after: always;
             page-break-inside: avoid;
-        }
-
-        /* Recuadro interno rojo con esquinas redondeadas exacto como lo marcaste */
-        .cartel-marco-interno {
-            border: 5px solid #991b1b;
-            border-radius: 20px;
-            padding: 35px 25px;
-            width: 100%;
-            height: 100%;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around;
-            align-items: center;
-            text-align: center;
-            background: white;
         }
     </style>
 </head>
@@ -806,12 +793,10 @@
             }
 
             div.innerHTML = `
-                <div class="cartel-marco-interno">
-                    ${headerCardHtml}
-                    <div style="background: #991b1b; color: white; padding: 10px 35px; border-radius: 50px; font-size: 2.2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 10px 0;">¡OFERTA!</div>
-                    <div style="font-size: 4rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 10px 0; line-height: 1.1;">${corte.nombre}</div>
-                    <div style="font-size: 5.5rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 15px 0; width: 100%; margin-top: 10px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 2rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
-                </div>
+                ${headerCardHtml}
+                <div style="background: #991b1b; color: white; padding: 10px 35px; border-radius: 50px; font-size: 2.2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 15px 0;">¡OFERTA!</div>
+                <div style="font-size: 4rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 10px 0; line-height: 1.1;">${corte.nombre}</div>
+                <div style="font-size: 5.5rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 15px 0; width: 100%; margin-top: 15px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 2rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
             `;
             contenedor.appendChild(div);
         });
