@@ -236,8 +236,8 @@
         }
 
         .logo-img-grande {
-            max-height: 70px;
-            max-width: 150px;
+            max-height: 65px;
+            max-width: 140px;
             object-fit: contain;
         }
 
@@ -250,12 +250,12 @@
             margin: 0 auto 5px auto;
         }
 
-        /* Estilo optimizado para Carteles A4 con salto de página limpio */
+        /* Cartel A4 con margen superior más generoso para que el marco quede perfecto */
         .cartel-a4 {
             background: white;
-            border: 6px solid #991b1b;
+            border: 5px solid #991b1b;
             border-radius: 20px;
-            padding: 25px 20px;
+            padding: 40px 20px 25px 20px;
             width: 190mm;
             height: 275mm;
             margin: 0 auto 20px auto;
@@ -263,7 +263,7 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-around;
             align-items: center;
             page-break-after: always;
             page-break-inside: avoid;
@@ -394,7 +394,6 @@
                 <h2>Lista de Precios Oficial</h2>
                 <button class="btn" onclick="exportarListaPDF()">📥 Exportar Lista a PDF</button>
             </div>
-            <!-- Contenedor acotado para entrar perfectamente en 1 sola hoja A4 -->
             <div class="card" id="areaListaPDF" style="background: white; padding: 20px 25px; max-width: 750px; margin: 0 auto;">
                 <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">
                     <div id="contenedorLogoLista" style="display: none; margin-bottom: 5px;">
@@ -786,7 +785,7 @@
                 `;
             } else {
                 headerCardHtml = `
-                    <div style="text-align: center; width: 100%; margin-bottom: 10px;">
+                    <div style="text-align: center; width: 100%; margin-bottom: 5px;">
                         <div style="font-size: 1.4rem; font-weight: bold; color: #1f2937; text-transform: uppercase;">${empresaNombre}</div>
                         <div style="font-size: 0.85rem; color: #6b7280;">${empresaDatos}</div>
                     </div>
@@ -795,15 +794,14 @@
 
             div.innerHTML = `
                 ${headerCardHtml}
-                <div style="background: #991b1b; color: white; padding: 8px 30px; border-radius: 50px; font-size: 2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 10px 0;">¡OFERTA!</div>
+                <div style="background: #991b1b; color: white; padding: 8px 30px; border-radius: 50px; font-size: 2rem; font-weight: bold; display: inline-block; letter-spacing: 2px; margin: 5px 0;">¡OFERTA!</div>
                 <div style="font-size: 3.2rem; font-weight: bold; color: #1f2937; text-transform: uppercase; margin: 5px 0; line-height: 1.1;">${corte.nombre}</div>
-                <div style="font-size: 4.2rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 10px 0; width: 100%; margin-top: 10px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 1.6rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
+                <div style="font-size: 4.2rem; font-weight: bold; color: #991b1b; border-top: 3px dashed #e5e7eb; border-bottom: 3px dashed #e5e7eb; padding: 10px 0; width: 100%; margin-top: 5px;">${formatearMoneda(corte.precioFinalCache || 0)} <span style="font-size: 1.6rem; color: #4b5563; font-weight: normal;">/ kg</span></div>
             `;
             contenedor.appendChild(div);
         });
     }
 
-    // Funciones optimizadas para descargar en formato A4 exacto
     function exportarListaPDF() {
         const elemento = document.getElementById('areaListaPDF');
         const opt = {
