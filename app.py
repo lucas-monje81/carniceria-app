@@ -13,9 +13,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Configuración de Turso (Podés poner tus datos acá o en las Environment Variables de Render)
-TURSO_URL = os.environ.get("TURSO_URL", "libsql://tu-base-de-datos.turso.io")
-TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "tu_token_aqui")
+TURSO_URL = os.environ.get("TURSO_URL", "libsql://carniceria-db-lucas-monje81.aws-sa-east-1.turso.io")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "zhv7i_djdHQGps4KMhzjeo6T1kC0E_6jNlesf_pXL9_yJEYFCYwrJvRqWBw")
 
 def get_db_connection():
     return libsql_client.connect(
@@ -26,16 +25,21 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     
+    # Configuración ahora con user_id para independencia total
     conn.execute('''
         CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT
+            user_id INTEGER,
+            key TEXT,
+            value TEXT,
+            PRIMARY KEY (user_id, key)
         )
     ''')
     
+    # Cortes asociados a cada usuario
     conn.execute('''
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             nombre TEXT,
             kilos REAL,
             precio_hist REAL,
@@ -56,16 +60,18 @@ def init_db():
         )
     ''')
 
-    # Crear administrador por defecto si no existe
+    # Crear administrador por defecto si no existe (user_id = 1)
     res = conn.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
-    count = res.rows[0][0]
-    if count == 0:
+    if res.rows[0][0] == 0:
         conn.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
                      ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
 
-    # Precargar cortes estándar si la tabla está vacía
-    res_cortes = conn.execute("SELECT COUNT(*) FROM cortes")
-    if res_cortes.rows[0][0] == 0:
+    conn.close()
+
+def cargar_cortes_iniciales_si_necesario(user_id):
+    conn = get_db_connection()
+    res = conn.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ?", [user_id])
+    if res.rows[0][0] == 0:
         cortes_iniciales = [
             ("MATAMBRE", 1.495, 20000, 0, 0),
             ("PALETA", 3.855, 14500, 22000, 1),
@@ -87,8 +93,8 @@ def init_db():
             ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
         ]
         for c in cortes_iniciales:
-            conn.execute("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)", c)
-
+            conn.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)", 
+                         [user_id, c[0], c[1], c[2], c[3], c[4]])
     conn.close()
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -117,12 +123,14 @@ def login():
                     session['username'] = uname
                     session['negocio'] = negocio
                     session['es_admin'] = es_admin
+                    cargar_cortes_iniciales_si_necesario(user_id)
                     return redirect(url_for('index'))
             else:
                 session['user_id'] = user_id
                 session['username'] = uname
                 session['negocio'] = negocio
                 session['es_admin'] = es_admin
+                cargar_cortes_iniciales_si_necesario(user_id)
                 return redirect(url_for('index'))
         else:
             error = 'Usuario o contraseña incorrectos.'
@@ -188,12 +196,13 @@ def get_data():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
+    user_id = session['user_id']
     conn = get_db_connection()
     
-    res_cortes = conn.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes")
+    res_cortes = conn.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", [user_id])
     cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in res_cortes.rows]
     
-    res_config = conn.execute("SELECT key, value FROM config")
+    res_config = conn.execute("SELECT key, value FROM config WHERE user_id = ?", [user_id])
     params = {}
     empresa = {'nombre': session.get('negocio', 'CARNICERÍA'), 'datos': 'Av. San Martín 1234 - Tel: 351-1234567', 'logo': ''}
     
@@ -215,27 +224,28 @@ def save_data():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
+    user_id = session['user_id']
     data = request.json
     conn = get_db_connection()
     
     if 'params' in data:
         p = data['params']
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('precio_media_res', ?)", [p.get('precioMediaRes')])
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('kilos_media_res', ?)", [p.get('kilosMediaRes')])
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('margen_deseado', ?)", [p.get('margenDeseadoGen')])
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('cant_semanal', ?)", [p.get('cantSemanal')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'precio_media_res', ?)", [user_id, p.get('precioMediaRes')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'kilos_media_res', ?)", [user_id, p.get('kilosMediaRes')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'margen_deseado', ?)", [user_id, p.get('margenDeseadoGen')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'cant_semanal', ?)", [user_id, p.get('cantSemanal')])
         
     if 'empresa' in data:
         e = data['empresa']
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_nombre', ?)", [e.get('nombre')])
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_datos', ?)", [e.get('datos')])
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", [e.get('logo')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_nombre', ?)", [user_id, e.get('nombre')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_datos', ?)", [user_id, e.get('datos')])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_logo', ?)", [user_id, e.get('logo')])
         
     if 'cortes' in data:
-        conn.execute("DELETE FROM cortes")
+        conn.execute("DELETE FROM cortes WHERE user_id = ?", [user_id])
         for c in data['cortes']:
-            conn.execute("INSERT INTO cortes (nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?)",
-                         [c.get('nombre'), c.get('kilos'), c.get('precio_hist'), c.get('precio_mod'), c.get('oferta')])
+            conn.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
+                         [user_id, c.get('nombre'), c.get('kilos'), c.get('precio_hist'), c.get('precio_mod'), c.get('oferta')])
                            
     conn.close()
     return jsonify({'status': 'success'})
@@ -245,6 +255,7 @@ def upload_logo():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
+    user_id = session['user_id']
     if 'logo' not in request.files:
         return jsonify({'status': 'error', 'message': 'No file part'})
     file = request.files['logo']
@@ -257,7 +268,7 @@ def upload_logo():
         logo_url = f'/{filepath}'
         
         conn = get_db_connection()
-        conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", [logo_url])
+        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_logo', ?)", [user_id, logo_url])
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
