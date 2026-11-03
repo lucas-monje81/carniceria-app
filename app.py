@@ -257,6 +257,14 @@ def upload_logo():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         logo_url = f'/{filepath}'
+        
+        # Guarda de forma persistente en la base de datos la ruta del logo
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('empresa_logo', ?)", (logo_url,))
+        conn.commit()
+        conn.close()
+
         return jsonify({'status': 'success', 'logo': logo_url})
 
 if __name__ == '__main__':
