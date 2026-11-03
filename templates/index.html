@@ -417,7 +417,7 @@
         <section id="view-lista" class="view-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" class="no-print">
                 <h2>Lista de Precios Oficial</h2>
-                <button class="btn" onclick="window.print()">🖨️ Imprimir Lista</button>
+                <button class="btn" onclick="window.print()">📥 Exportar Lista a PDF</button>
             </div>
             <div class="card printable-area" style="background: white; padding: 30px; max-width: 800px; margin: 0 auto;">
                 <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--primary); padding-bottom: 15px;">
@@ -451,7 +451,7 @@
         <section id="view-ofertas" class="view-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" class="no-print">
                 <h2>Carteles de Oferta para Imprimir (Tamaño A4)</h2>
-                <button class="btn" onclick="window.print()">🖨️ Imprimir Carteles</button>
+                <button class="btn" onclick="window.print()">📥 Exportar Carteles a PDF</button>
             </div>
             <div id="contenedorCartelesA4" class="printable-area"></div>
         </section>
@@ -890,24 +890,4 @@
 
         if(!nombre) { alert('Por favor ingresa el nombre del corte'); return; }
 
-        cortesData.push({ nombre: nombre.toUpperCase(), kilos: kilos, precio_hist: precioHist, precio_mod: 0, oferta: 0 });
-        document.getElementById('nuevoNombre').value = '';
-        document.getElementById('nuevoKilos').value = '';
-        document.getElementById('nuevoPrecioHist').value = '';
-        renderizarTablaAdmin();
-        guardarTodoEnServidor();
-        alert('Corte agregado con éxito');
-    }
-
-    function eliminarCorte(index) {
-        if(confirm('¿Seguro querés eliminar este corte?')) {
-            cortesData.splice(index, 1);
-            renderizarTablaAdmin();
-            guardarTodoEnServidor();
-        }
-    }
-
-    window.onload = function() { cargarDatosDesdeServidor(); };
-</script>
-</body>
-</html>
+        cortesData.push({ nombre: nombre.toUpperCase(), kilos: kilos, precio_hist: precioHist, precio_mod: 0, oferta:
