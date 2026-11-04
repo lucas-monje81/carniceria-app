@@ -17,7 +17,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 TURSO_URL = os.environ.get("TURSO_URL", "libsql://carniceria-db-lucas-monje81.aws-sa-east-1.turso.io")
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "zhv7i_djdHQGps4KMhzjeo6T1kC0E_6jNlesf_pXL9_yJEYFCYwrJvRqWBw")
 
-# Conector HTTP optimizado para Turso con conversión automática de tipos (Fix para logins y contadores)
+# Conector HTTP optimizado para Turso con conversión automática de tipos
 class TursoConnection:
     def __init__(self, url, token):
         self.url = url.replace("libsql://", "https://") + "/v2/pipeline"
@@ -77,7 +77,6 @@ class TursoConnection:
                                     val_str = list(cell.values())[0] if cell else None
                                     v_type = "text"
                                 
-                                # Convertir tipos correctamente para evitar fallos lógicos
                                 if v_type in ("integer", "int"):
                                     val = int(val_str) if val_str is not None and val_str != "" else 0
                                 elif v_type in ("float", "real"):
@@ -141,12 +140,15 @@ def init_db():
         )
     ''')
 
-    res = conn.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
-    if not res.rows or res.rows[0][0] == 0:
+    # Verificar y asegurar el admin por defecto
+    res = conn.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+    if not res.rows:
         conn.execute("""
             INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
+    else:
+        conn.execute("UPDATE usuarios SET password = '1234', es_admin = 1, activo = 1 WHERE username = 'admin'")
 
     conn.close()
 
@@ -359,7 +361,7 @@ def upload_logo():
 
         return jsonify({'status': 'success', 'logo': logo_url})
 
-# Inicializar base de datos y crear admin al arrancar
+# Inicializar base de datos al arrancar la app en Render
 init_db()
 
 if __name__ == '__main__':
