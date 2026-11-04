@@ -17,7 +17,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 TURSO_URL = os.environ.get("TURSO_URL", "libsql://carniceria-db-lucas-monje81.aws-sa-east-1.turso.io")
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "zhv7i_djdHQGps4KMhzjeo6T1kC0E_6jNlesf_pXL9_yJEYFCYwrJvRqWBw")
 
-# Adaptador limpio para Turso usando SQLite estándar sobre HTTP
+# Conector HTTP optimizado para Turso con conversión automática de tipos (Fix para logins y contadores)
 class TursoConnection:
     def __init__(self, url, token):
         self.url = url.replace("libsql://", "https://") + "/v2/pipeline"
@@ -65,20 +65,35 @@ class TursoConnection:
                 results = res_data.get("results", [])
                 if results and results[0].get("type") == "ok":
                     res_inner = results[0].get("response", {})
-                    cols = [c["name"] for c in res_inner.get("cols", [])]
                     rows = []
                     for r in res_inner.get("rows", []):
                         row_vals = []
                         for cell in r:
-                            val = list(cell.values())[0] if cell else None
+                            val = None
+                            if isinstance(cell, dict):
+                                val_str = cell.get("value")
+                                v_type = cell.get("type", "").lower()
+                                if val_str is None:
+                                    val_str = list(cell.values())[0] if cell else None
+                                    v_type = "text"
+                                
+                                # Convertir tipos correctamente para evitar fallos lógicos
+                                if v_type in ("integer", "int"):
+                                    val = int(val_str) if val_str is not None and val_str != "" else 0
+                                elif v_type in ("float", "real"):
+                                    val = float(val_str) if val_str is not None and val_str != "" else 0.0
+                                else:
+                                    val = val_str
+                            else:
+                                val = cell
                             row_vals.append(val)
                         rows.append(row_vals)
-                    return TursoResult(cols, rows)
+                    return TursoResult(rows)
                 elif results and results[0].get("type") == "error":
                     print("Error SQL Turso:", results[0].get("error"))
         except Exception as e:
             print("Error de conexión Turso HTTP:", e)
-        return TursoResult([], [])
+        return TursoResult([])
 
     def commit(self):
         pass
@@ -87,8 +102,7 @@ class TursoConnection:
         pass
 
 class TursoResult:
-    def __init__(self, cols, rows):
-        self.cols = cols
+    def __init__(self, rows):
         self.rows = rows
 
 def get_db_connection():
@@ -345,7 +359,7 @@ def upload_logo():
 
         return jsonify({'status': 'success', 'logo': logo_url})
 
-# Ejecución obligatoria al arrancar (para que Gunicorn en Render cree las tablas y el admin)
+# Inicializar base de datos y crear admin al arrancar
 init_db()
 
 if __name__ == '__main__':
