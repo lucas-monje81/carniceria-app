@@ -185,11 +185,17 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
+        # Acceso directo de emergencia buscando el ID real del admin en la base de datos
         if username == 'admin' and password == '1234':
-            session['user_id'] = 1
+            conn = get_db_connection()
+            res = conn.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+            admin_id = res.rows[0][0] if res.rows and res.rows[0] else 1
+            conn.close()
+            
+            session['user_id'] = admin_id
             session['username'] = 'admin'
             session['es_admin'] = 1
-            cargar_cortes_iniciales_si_necesario(1)
+            cargar_cortes_iniciales_si_necesario(admin_id)
             return redirect(url_for('index'))
         
         conn = get_db_connection()
@@ -310,7 +316,6 @@ def save_data():
     data = request.json or {}
     conn = get_db_connection()
     
-    # Aceptar tanto formato camelCase como snake_case para evitar que se pisen con valores vacíos
     if 'params' in data:
         p = data['params']
         precio = p.get('precioMediaRes') or p.get('precio_media_res') or '10.000'
