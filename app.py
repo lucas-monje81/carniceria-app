@@ -345,7 +345,9 @@ def upload_logo():
 
         return jsonify({'status': 'success', 'logo': logo_url})
 
+# Ejecución obligatoria al arrancar (para que Gunicorn en Render cree las tablas y el admin)
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
