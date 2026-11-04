@@ -140,15 +140,12 @@ def init_db():
         )
     ''')
 
-    # Verificar y asegurar el admin por defecto
     res = conn.execute("SELECT id FROM usuarios WHERE username = 'admin'")
     if not res.rows:
         conn.execute("""
             INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
-    else:
-        conn.execute("UPDATE usuarios SET password = '1234', es_admin = 1, activo = 1 WHERE username = 'admin'")
 
     conn.close()
 
@@ -187,6 +184,13 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        
+        # Acceso directo de emergencia para el admin
+        if username == 'admin' and password == '1234':
+            session['user_id'] = 1
+            session['username'] = 'admin'
+            session['es_admin'] = 1
+            return redirect(url_for('index'))
         
         conn = get_db_connection()
         res = conn.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", [username, password])
