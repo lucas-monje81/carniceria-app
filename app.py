@@ -25,17 +25,26 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     
-    # Configuración ahora con user_id para independencia total
+    # Tabla de usuarios con sus datos de negocio y parámetros propios integrados
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS config (
-            user_id INTEGER,
-            key TEXT,
-            value TEXT,
-            PRIMARY KEY (user_id, key)
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            nombre_negocio TEXT,
+            datos_contacto TEXT,
+            logo TEXT,
+            precio_media_res TEXT,
+            kilos_media_res TEXT,
+            margen_deseado TEXT,
+            cant_semanal TEXT,
+            vencimiento TEXT,
+            activo INTEGER DEFAULT 1,
+            es_admin INTEGER DEFAULT 0
         )
     ''')
     
-    # Cortes asociados a cada usuario
+    # Tabla de cortes estrictamente vinculada a cada usuario por user_id
     conn.execute('''
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,23 +57,13 @@ def init_db():
         )
     ''')
 
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            nombre_negocio TEXT,
-            vencimiento TEXT,
-            activo INTEGER DEFAULT 1,
-            es_admin INTEGER DEFAULT 0
-        )
-    ''')
-
-    # Crear administrador por defecto si no existe (user_id = 1)
+    # Crear administrador por defecto si no existe
     res = conn.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
     if res.rows[0][0] == 0:
-        conn.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, ?, ?)",
-                     ('admin', '1234', 'ADMINISTRADOR GENERAL', '2099-12-31', 1, 1))
+        conn.execute("""
+            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
 
     conn.close()
 
@@ -121,14 +120,12 @@ def login():
                 else:
                     session['user_id'] = user_id
                     session['username'] = uname
-                    session['negocio'] = negocio
                     session['es_admin'] = es_admin
                     cargar_cortes_iniciales_si_necesario(user_id)
                     return redirect(url_for('index'))
             else:
                 session['user_id'] = user_id
                 session['username'] = uname
-                session['negocio'] = negocio
                 session['es_admin'] = es_admin
                 cargar_cortes_iniciales_si_necesario(user_id)
                 return redirect(url_for('index'))
@@ -161,8 +158,10 @@ def crear_cliente():
     
     conn = get_db_connection()
     try:
-        conn.execute("INSERT INTO usuarios (username, password, nombre_negocio, vencimiento, activo, es_admin) VALUES (?, ?, ?, ?, 1, 0)",
-                     [username, password, negocio, vencimiento])
+        conn.execute("""
+            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+        """, [username, password, negocio, 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', vencimiento])
     except Exception as e:
         print("Error al crear cliente:", e)
     conn.close()
@@ -199,23 +198,29 @@ def get_data():
     user_id = session['user_id']
     conn = get_db_connection()
     
+    # Obtener datos del usuario actual
+    res_user = conn.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", [user_id])
+    user_row = res_user.rows[0] if res_user.rows else None
+    
+    params = {}
+    empresa = {'nombre': 'CARNICERÍA', 'datos': '', 'logo': ''}
+    
+    if user_row:
+        empresa = {
+            'nombre': user_row[0] or 'CARNICERÍA',
+            'datos': user_row[1] or '',
+            'logo': user_row[2] or ''
+        }
+        params = {
+            'precio_media_res': user_row[3] or '10.000',
+            'kilos_media_res': user_row[4] or '92',
+            'margen_deseado': user_row[5] or '40',
+            'cant_semanal': user_row[6] or '16'
+        }
+
     res_cortes = conn.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", [user_id])
     cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in res_cortes.rows]
     
-    res_config = conn.execute("SELECT key, value FROM config WHERE user_id = ?", [user_id])
-    params = {}
-    empresa = {'nombre': session.get('negocio', 'CARNICERÍA'), 'datos': 'Av. San Martín 1234 - Tel: 351-1234567', 'logo': ''}
-    
-    for r in res_config.rows:
-        k, v = r[0], r[1]
-        if k == 'precio_media_res': params['precio_media_res'] = v
-        elif k == 'kilos_media_res': params['kilos_media_res'] = v
-        elif k == 'margen_deseado': params['margen_deseado'] = v
-        elif k == 'cant_semanal': params['cant_semanal'] = v
-        elif k == 'empresa_nombre': empresa['nombre'] = v
-        elif k == 'empresa_datos': empresa['datos'] = v
-        elif k == 'empresa_logo': empresa['logo'] = v
-        
     conn.close()
     return jsonify({'cortes': cortes, 'params': params, 'empresa': empresa})
 
@@ -230,16 +235,15 @@ def save_data():
     
     if 'params' in data:
         p = data['params']
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'precio_media_res', ?)", [user_id, p.get('precioMediaRes')])
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'kilos_media_res', ?)", [user_id, p.get('kilosMediaRes')])
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'margen_deseado', ?)", [user_id, p.get('margenDeseadoGen')])
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'cant_semanal', ?)", [user_id, p.get('cantSemanal')])
+        conn.execute("""
+            UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
+        """, [p.get('precioMediaRes'), p.get('kilosMediaRes'), p.get('margenDeseadoGen'), p.get('cantSemanal'), user_id])
         
     if 'empresa' in data:
         e = data['empresa']
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_nombre', ?)", [user_id, e.get('nombre')])
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_datos', ?)", [user_id, e.get('datos')])
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_logo', ?)", [user_id, e.get('logo')])
+        conn.execute("""
+            UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
+        """, [e.get('nombre'), e.get('datos'), e.get('logo'), user_id])
         
     if 'cortes' in data:
         conn.execute("DELETE FROM cortes WHERE user_id = ?", [user_id])
@@ -268,7 +272,7 @@ def upload_logo():
         logo_url = f'/{filepath}'
         
         conn = get_db_connection()
-        conn.execute("INSERT OR REPLACE INTO config (user_id, key, value) VALUES (?, 'empresa_logo', ?)", [user_id, logo_url])
+        conn.execute("UPDATE usuarios SET logo = ? WHERE id = ?", [logo_url, user_id])
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
