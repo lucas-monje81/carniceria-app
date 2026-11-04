@@ -182,8 +182,8 @@ def cargar_cortes_iniciales_si_necesario(user_id):
 def login():
     error = None
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
         
         if username == 'admin' and password == '1234':
             session['user_id'] = 1
@@ -229,10 +229,10 @@ def crear_cliente():
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
         
-    username = request.form.get('username')
+    username = request.form.get('username') or request.form.get('usuario')
     password = request.form.get('password')
-    negocio = request.form.get('negocio')
-    vencimiento = request.form.get('vencimiento')
+    negocio = request.form.get('negocio') or request.form.get('nombre_negocio')
+    vencimiento = request.form.get('vencimiento') or '2026-12-31'
     
     conn = get_db_connection()
     try:
@@ -310,17 +310,27 @@ def save_data():
     data = request.json or {}
     conn = get_db_connection()
     
+    # Aceptar tanto formato camelCase como snake_case para evitar que se pisen con valores vacíos
     if 'params' in data:
         p = data['params']
+        precio = p.get('precioMediaRes') or p.get('precio_media_res') or '10.000'
+        kilos = p.get('kilosMediaRes') or p.get('kilos_media_res') or '92'
+        margen = p.get('margenDeseadoGen') or p.get('margenDeseado') or p.get('margen_deseado') or '40'
+        cant = p.get('cantSemanal') or p.get('cant_semanal') or '16'
+        
         conn.execute("""
             UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
-        """, [str(p.get('precioMediaRes', '10.000')), str(p.get('kilosMediaRes', '92')), str(p.get('margenDeseadoGen', '40')), str(p.get('cantSemanal', '16')), user_id])
+        """, [str(precio), str(kilos), str(margen), str(cant), user_id])
         
     if 'empresa' in data:
         e = data['empresa']
+        nombre = e.get('nombre') or e.get('nombre_negocio') or 'CARNICERÍA'
+        datos = e.get('datos') or e.get('datos_contacto') or ''
+        logo = e.get('logo') or ''
+        
         conn.execute("""
             UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
-        """, [str(e.get('nombre', '')), str(e.get('datos', '')), str(e.get('logo', '')), user_id])
+        """, [str(nombre), str(datos), str(logo), user_id])
         
     if 'cortes' in data:
         conn.execute("DELETE FROM cortes WHERE user_id = ?", [user_id])
