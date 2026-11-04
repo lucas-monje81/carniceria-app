@@ -17,7 +17,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 TURSO_URL = os.environ.get("TURSO_URL", "libsql://carniceria-db-lucas-monje81.aws-sa-east-1.turso.io")
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "zhv7i_djdHQGps4KMhzjeo6T1kC0E_6jNlesf_pXL9_yJEYFCYwrJvRqWBw")
 
-# Conector HTTP optimizado para Turso con conversión automática de tipos
+# Conector HTTP optimizado para Turso
 class TursoConnection:
     def __init__(self, url, token):
         self.url = url.replace("libsql://", "https://") + "/v2/pipeline"
@@ -185,11 +185,11 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        # Acceso directo de emergencia para el admin
         if username == 'admin' and password == '1234':
             session['user_id'] = 1
             session['username'] = 'admin'
             session['es_admin'] = 1
+            cargar_cortes_iniciales_si_necesario(1)
             return redirect(url_for('index'))
         
         conn = get_db_connection()
@@ -199,19 +199,8 @@ def login():
         
         if user:
             user_id, uname, negocio, vencimiento, activo, es_admin = user
-            
             if activo == 0:
-                error = 'Su cuenta se encuentra desactivada. Comuníquese con soporte.'
-            elif not es_admin and vencimiento:
-                hoy = datetime.now().strftime('%Y-%m-%d')
-                if hoy > vencimiento:
-                    error = f'Su licencia venció el {vencimiento}. Renueve su suscripción.'
-                else:
-                    session['user_id'] = user_id
-                    session['username'] = uname
-                    session['es_admin'] = es_admin
-                    cargar_cortes_iniciales_si_necesario(user_id)
-                    return redirect(url_for('index'))
+                error = 'Su cuenta se encuentra desactivada.'
             else:
                 session['user_id'] = user_id
                 session['username'] = uname
@@ -240,17 +229,17 @@ def crear_cliente():
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
         
-    username = request.form['username']
-    password = request.form['password']
-    negocio = request.form['negocio']
-    vencimiento = request.form['vencimiento']
+    username = request.form.get('username')
+    password = request.form.get('password')
+    negocio = request.form.get('negocio')
+    vencimiento = request.form.get('vencimiento')
     
     conn = get_db_connection()
     try:
         conn.execute("""
             INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
-        """, [username, password, negocio, 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', vencimiento])
+        """, [username, password, negocio, 'Av. San Martín 1234', '', '10.000', '92', '40', '16', vencimiento])
     except Exception as e:
         print("Error al crear cliente:", e)
     conn.close()
@@ -318,26 +307,26 @@ def save_data():
         return jsonify({'error': 'No autorizado'}), 401
         
     user_id = session['user_id']
-    data = request.json
+    data = request.json or {}
     conn = get_db_connection()
     
     if 'params' in data:
         p = data['params']
         conn.execute("""
             UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
-        """, [p.get('precioMediaRes'), p.get('kilosMediaRes'), p.get('margenDeseadoGen'), p.get('cantSemanal'), user_id])
+        """, [str(p.get('precioMediaRes', '10.000')), str(p.get('kilosMediaRes', '92')), str(p.get('margenDeseadoGen', '40')), str(p.get('cantSemanal', '16')), user_id])
         
     if 'empresa' in data:
         e = data['empresa']
         conn.execute("""
             UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
-        """, [e.get('nombre'), e.get('datos'), e.get('logo'), user_id])
+        """, [str(e.get('nombre', '')), str(e.get('datos', '')), str(e.get('logo', '')), user_id])
         
     if 'cortes' in data:
         conn.execute("DELETE FROM cortes WHERE user_id = ?", [user_id])
         for c in data['cortes']:
             conn.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
-                         [user_id, c.get('nombre'), c.get('kilos'), c.get('precio_hist'), c.get('precio_mod'), c.get('oferta')])
+                         [user_id, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))])
                            
     conn.close()
     return jsonify({'status': 'success'})
@@ -365,7 +354,6 @@ def upload_logo():
 
         return jsonify({'status': 'success', 'logo': logo_url})
 
-# Inicializar base de datos al arrancar la app en Render
 init_db()
 
 if __name__ == '__main__':
