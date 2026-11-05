@@ -1,8 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from werkzeug.utils import secure_filename
-import urllib.request
-import json
+import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
@@ -14,103 +13,18 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-TURSO_URL = os.environ.get("TURSO_URL", "libsql://carniceria-db-lucas-monje81.aws-sa-east-1.turso.io")
-TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "zhv7i_djdHQGps4KMhzjeo6T1kC0E_6jNlesf_pXL9_yJEYFCYwrJvRqWBw")
-
-# Conector HTTP optimizado para Turso
-class TursoConnection:
-    def __init__(self, url, token):
-        self.url = url.replace("libsql://", "https://") + "/v2/pipeline"
-        self.token = token
-
-    def execute(self, query, params=None):
-        params = params or []
-        stmt_params = []
-        for p in params:
-            if isinstance(p, int):
-                stmt_params.append({"type": "integer", "value": str(p)})
-            elif isinstance(p, float):
-                stmt_params.append({"type": "float", "value": str(p)})
-            else:
-                stmt_params.append({"type": "text", "value": str(p) if p is not None else ""})
-
-        body = {
-            "requests": [
-                {
-                    "type": "execute",
-                    "stmt": {
-                        "sql": query,
-                        "args": stmt_params
-                    }
-                },
-                {
-                    "type": "close"
-                }
-            ]
-        }
-        
-        req = urllib.request.Request(
-            self.url,
-            data=json.dumps(body).encode('utf-8'),
-            headers={
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json"
-            },
-            method="POST"
-        )
-        
-        try:
-            with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                results = res_data.get("results", [])
-                if results and results[0].get("type") == "ok":
-                    res_inner = results[0].get("response", {})
-                    rows = []
-                    for r in res_inner.get("rows", []):
-                        row_vals = []
-                        for cell in r:
-                            val = None
-                            if isinstance(cell, dict):
-                                val_str = cell.get("value")
-                                v_type = cell.get("type", "").lower()
-                                if val_str is None:
-                                    val_str = list(cell.values())[0] if cell else None
-                                    v_type = "text"
-                                
-                                if v_type in ("integer", "int"):
-                                    val = int(val_str) if val_str is not None and val_str != "" else 0
-                                elif v_type in ("float", "real"):
-                                    val = float(val_str) if val_str is not None and val_str != "" else 0.0
-                                else:
-                                    val = val_str
-                            else:
-                                val = cell
-                            row_vals.append(val)
-                        rows.append(row_vals)
-                    return TursoResult(rows)
-                elif results and results[0].get("type") == "error":
-                    print("Error SQL Turso:", results[0].get("error"))
-        except Exception as e:
-            print("Error de conexión Turso HTTP:", e)
-        return TursoResult([])
-
-    def commit(self):
-        pass
-
-    def close(self):
-        pass
-
-class TursoResult:
-    def __init__(self, rows):
-        self.rows = rows
+DB_NAME = 'carniceria.db'
 
 def get_db_connection():
-    return TursoConnection(TURSO_URL, TURSO_AUTH_TOKEN)
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
     conn = get_db_connection()
+    cursor = conn.cursor()
     
-    conn.execute('''
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
@@ -128,7 +42,7 @@ def init_db():
         )
     ''')
     
-    conn.execute('''
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -140,19 +54,26 @@ def init_db():
         )
     ''')
 
-    res = conn.execute("SELECT id FROM usuarios WHERE username = 'admin'")
-    if not res.rows:
-        conn.execute("""
+    cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute("""
             INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
+    else:
+        cursor.execute("UPDATE usuarios SET password = '1234', es_admin = 1, activo = 1 WHERE username = 'admin'")
 
+    conn.commit()
     conn.close()
 
 def cargar_cortes_iniciales_si_necesario(user_id):
     conn = get_db_connection()
-    res = conn.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ?", [user_id])
-    if res.rows and res.rows[0][0] == 0:
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ?", (user_id,))
+    count = cursor.fetchone()[0]
+    
+    if count == 0:
         cortes_iniciales = [
             ("MATAMBRE", 1.495, 20000, 0, 0),
             ("PALETA", 3.855, 14500, 22000, 1),
@@ -174,8 +95,9 @@ def cargar_cortes_iniciales_si_necesario(user_id):
             ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
         ]
         for c in cortes_iniciales:
-            conn.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)", 
-                         [user_id, c[0], c[1], c[2], c[3], c[4]])
+            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)", 
+                           (user_id, c[0], c[1], c[2], c[3], c[4]))
+        conn.commit()
     conn.close()
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -185,22 +107,10 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # Acceso directo de emergencia buscando el ID real del admin en la base de datos
-        if username == 'admin' and password == '1234':
-            conn = get_db_connection()
-            res = conn.execute("SELECT id FROM usuarios WHERE username = 'admin'")
-            admin_id = res.rows[0][0] if res.rows and res.rows[0] else 1
-            conn.close()
-            
-            session['user_id'] = admin_id
-            session['username'] = 'admin'
-            session['es_admin'] = 1
-            cargar_cortes_iniciales_si_necesario(admin_id)
-            return redirect(url_for('index'))
-        
         conn = get_db_connection()
-        res = conn.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", [username, password])
-        user = res.rows[0] if res.rows else None
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", (username, password))
+        user = cursor.fetchone()
         conn.close()
         
         if user:
@@ -224,8 +134,9 @@ def admin_licencias():
         return redirect(url_for('login'))
         
     conn = get_db_connection()
-    res = conn.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
-    clientes = res.rows if res.rows else []
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
+    clientes = cursor.fetchall()
     conn.close()
     
     return render_template('admin_licencias.html', clientes=clientes)
@@ -241,11 +152,13 @@ def crear_cliente():
     vencimiento = request.form.get('vencimiento') or '2026-12-31'
     
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        conn.execute("""
+        cursor.execute("""
             INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
-        """, [username, password, negocio, 'Av. San Martín 1234', '', '10.000', '92', '40', '16', vencimiento])
+        """, (username, password, negocio, 'Av. San Martín 1234', '', '10.000', '92', '40', '16', vencimiento))
+        conn.commit()
     except Exception as e:
         print("Error al crear cliente:", e)
     conn.close()
@@ -258,7 +171,9 @@ def toggle_cliente(id):
         return redirect(url_for('login'))
         
     conn = get_db_connection()
-    conn.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", [id])
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", (id,))
+    conn.commit()
     conn.close()
     
     return redirect(url_for('admin_licencias'))
@@ -281,9 +196,10 @@ def get_data():
         
     user_id = session['user_id']
     conn = get_db_connection()
+    cursor = conn.cursor()
     
-    res_user = conn.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", [user_id])
-    user_row = res_user.rows[0] if res_user.rows else None
+    cursor.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", (user_id,))
+    user_row = cursor.fetchone()
     
     params = {}
     empresa = {'nombre': 'CARNICERÍA', 'datos': '', 'logo': ''}
@@ -301,8 +217,9 @@ def get_data():
             'cant_semanal': user_row[6] or '16'
         }
 
-    res_cortes = conn.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", [user_id])
-    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in res_cortes.rows] if res_cortes.rows else []
+    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", (user_id,))
+    cortes_rows = cursor.fetchall()
+    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in cortes_rows]
     
     conn.close()
     return jsonify({'cortes': cortes, 'params': params, 'empresa': empresa})
@@ -315,6 +232,7 @@ def save_data():
     user_id = session['user_id']
     data = request.json or {}
     conn = get_db_connection()
+    cursor = conn.cursor()
     
     if 'params' in data:
         p = data['params']
@@ -323,9 +241,9 @@ def save_data():
         margen = p.get('margenDeseadoGen') or p.get('margenDeseado') or p.get('margen_deseado') or '40'
         cant = p.get('cantSemanal') or p.get('cant_semanal') or '16'
         
-        conn.execute("""
+        cursor.execute("""
             UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
-        """, [str(precio), str(kilos), str(margen), str(cant), user_id])
+        """, (str(precio), str(kilos), str(margen), str(cant), user_id))
         
     if 'empresa' in data:
         e = data['empresa']
@@ -333,16 +251,17 @@ def save_data():
         datos = e.get('datos') or e.get('datos_contacto') or ''
         logo = e.get('logo') or ''
         
-        conn.execute("""
+        cursor.execute("""
             UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
-        """, [str(nombre), str(datos), str(logo), user_id])
+        """, (str(nombre), str(datos), str(logo), user_id))
         
     if 'cortes' in data:
-        conn.execute("DELETE FROM cortes WHERE user_id = ?", [user_id])
+        cursor.execute("DELETE FROM cortes WHERE user_id = ?", (user_id,))
         for c in data['cortes']:
-            conn.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
-                         [user_id, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))])
+            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
+                           (user_id, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))))
                            
+    conn.commit()
     conn.close()
     return jsonify({'status': 'success'})
 
@@ -364,7 +283,9 @@ def upload_logo():
         logo_url = f'/{filepath}'
         
         conn = get_db_connection()
-        conn.execute("UPDATE usuarios SET logo = ? WHERE id = ?", [logo_url, user_id])
+        cursor = conn.cursor()
+        cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
+        conn.commit()
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
