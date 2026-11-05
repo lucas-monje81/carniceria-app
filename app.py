@@ -327,6 +327,11 @@ def upload_logo():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
+ @app.route('/api/upload-logo', methods=['POST'])
+def upload_logo():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+        
     user_id = session['user_id']
     if 'logo' not in request.files:
         return jsonify({'status': 'error', 'message': 'No file part'})
@@ -350,5 +355,5 @@ def upload_logo():
 init_db()
 
 if __name__ == '__main__':
-    port = int(os.environ.gen('PORT', 5000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
