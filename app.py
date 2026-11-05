@@ -46,6 +46,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS cortes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
+            tipo TEXT DEFAULT 'vacuna',
             nombre TEXT,
             kilos REAL,
             precio_hist REAL,
@@ -70,11 +71,11 @@ def init_db():
 def cargar_cortes_iniciales_si_necesario(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ?", (user_id,))
-    count = cursor.fetchone()[0]
     
-    if count == 0:
-        cortes_iniciales = [
+    # Verificar cortes vacunos
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'vacuna'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_vacuna = [
             ("MATAMBRE", 1.495, 20000, 0, 0),
             ("PALETA", 3.855, 14500, 22000, 1),
             ("FALDA", 5.020, 7500, 13000, 0),
@@ -94,9 +95,27 @@ def cargar_cortes_iniciales_si_necesario(user_id):
             ("AGUJAS", 8.580, 7500, 13000, 0),
             ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
         ]
-        for c in cortes_iniciales:
-            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)", 
+        for c in cortes_vacuna:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'vacuna', ?, ?, ?, ?, ?)", 
                            (user_id, c[0], c[1], c[2], c[3], c[4]))
+
+    # Verificar cortes de cerdo
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'cerdo'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_cerdo = [
+            ("BLANDO DE CERDO", 7.405, 12000, 16000, 1),
+            ("BONDIOLA DE CERDO", 2.255, 12000, 16000, 1),
+            ("CHORIZO DE CERDO", 8.750, 10000, 13000, 1),
+            ("GRASA DE CERDO", 5.030, 4500, 5900, 0),
+            ("COSTELETA DE CERDO", 5.705, 8990, 10000, 1),
+            ("VACIO DE CERDO", 2.040, 10000, 13000, 1),
+            ("COSTILLA DE CERDO", 4.630, 9000, 10000, 1),
+            ("MATAMBRE DE CERDO", 1.550, 15900, 18000, 1)
+        ]
+        for c in cortes_cerdo:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'cerdo', ?, ?, ?, ?, ?)", 
+                           (user_id, c[0], c[1], c[2], c[3], c[4]))
+        
         conn.commit()
     conn.close()
 
@@ -203,12 +222,19 @@ def index():
         return redirect(url_for('login'))
     return render_template('index.html', es_admin=session.get('es_admin', 0))
 
+@app.route('/cerdo')
+def cerdo():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo.html', es_admin=session.get('es_admin', 0))
+
 @app.route('/api/data', methods=['GET'])
 def get_data():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
         
     user_id = session['user_id']
+    tipo = request.args.get('tipo', 'vacuna')
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -231,7 +257,7 @@ def get_data():
             'cant_semanal': user_row[6] or '16'
         }
 
-    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ? AND tipo = ?", (user_id, tipo))
     cortes_rows = cursor.fetchall()
     cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in cortes_rows]
     
@@ -244,6 +270,7 @@ def save_data():
         return jsonify({'error': 'No autorizado'}), 401
         
     user_id = session['user_id']
+    tipo = request.args.get('tipo', 'vacuna')
     data = request.json or {}
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -270,10 +297,10 @@ def save_data():
         """, (str(nombre), str(datos), str(logo), user_id))
         
     if 'cortes' in data:
-        cursor.execute("DELETE FROM cortes WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM cortes WHERE user_id = ? AND tipo = ?", (user_id, tipo))
         for c in data['cortes']:
-            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))))
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (user_id, tipo, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))))
                            
     conn.commit()
     conn.close()
@@ -299,7 +326,7 @@ def upload_logo():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
-        cursor.execute("COMMIT")
+        conn.commit()
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
