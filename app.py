@@ -120,7 +120,7 @@ def login():
         user = cursor.fetchone()
         conn.close()
         if user:
-            user_id, uname, negocio, vencimiento, activo, es_admin = user
+            user_id, uname, negocio, vencimiento, activo, es_admin = user[0], user[1], user[2], user[3], user[4], user[5]
             if activo == 0:
                 error = 'Su cuenta se encuentra desactivada.'
             else:
@@ -244,4 +244,3 @@ def get_data():
         params = {
             'precio_media_res': user_row[3] or '10.000',
             'kilos_media_res': user_row[4] or '92',
-            'margen_deseado': user_row[5] or '40',
