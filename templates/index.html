@@ -1,236 +1,354 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestión - Carnicería App</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #f8f9fa; }
-        .sidebar { min-height: 100vh; background-color: #1a1d20; color: white; }
-        .sidebar a { color: #adb5bd; text-decoration: none; padding: 10px 15px; display: block; border-radius: 5px; margin-bottom: 5px; }
-        .sidebar a:hover, .sidebar a.active { color: white; background-color: #dc3545; }
-        .card { border: none; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075); }
-    </style>
-</head>
-<body>
+import os
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from werkzeug.utils import secure_filename
+import sqlite3
+from datetime import datetime
 
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Menú Lateral -->
-            <nav class="col-md-2 d-none d-md-block sidebar p-3">
-                <h4 class="text-white mb-4"><i class="fa-solid fa-drumstick-bite"></i> Carnicería App</h4>
-                <ul class="nav flex-column">
-                    <li class="nav-item"><a href="/" class="nav-link active"><i class="fa-solid fa-cow me-2"></i> Carne Vacuna</a></li>
-                    <li class="nav-item"><a href="/cerdo" class="nav-link"><i class="fa-solid fa-piggy-bank me-2"></i> Carne Cerdo</a></li>
-                    <li class="nav-item"><a href="/admin/licencias" class="nav-link {% if not es_admin %}d-none{% endif %}"><i class="fa-solid fa-key me-2"></i> Licencias (Admin)</a></li>
-                </ul>
-                <div class="mt-auto pt-5">
-                    <a href="/logout" class="btn btn-danger w-100"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</a>
-                </div>
-            </nav>
+app = Flask(__name__)
+app.secret_key = 'clave_secreta_super_segura_para_sesiones'
 
-            <!-- Contenido Principal -->
-            <main class="col-md-10 ms-sm-auto px-md-4 py-4">
-                <h2 class="mb-4">Configuración de Desposte y Estructura Base</h2>
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-                <!-- Parámetros Generales -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">Control de Kilos y Merma del Desposte</h5>
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Total Kilos Cortes</label>
-                                <input type="text" id="totalKilosCortes" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Kilos Media Res</label>
-                                <input type="number" id="kilosMediaRes" class="form-control" value="92" oninput="calcularTodo()">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Merma</label>
-                                <input type="text" id="mermaKilos" class="form-control" readonly>
-                            </div>
-                        </div>
-                        <div class="row g-3 mt-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Precio Media Res ($)</label>
-                                <input type="number" id="precioMediaRes" class="form-control" value="10000" oninput="calcularTodo()">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Margen Deseado Genérico (%)</label>
-                                <input type="number" id="margenDeseadoGen" class="form-control" value="40" oninput="calcularTodo()">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-                <!-- Agregar Corte -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">Agregar Nuevo Corte</h5>
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <input type="text" id="nuevoNombre" class="form-control" placeholder="Ej: LOMO">
-                            </div>
-                            <div class="col-md-3">
-                                <input type="number" step="0.001" id="nuevoKilos" class="form-control" placeholder="1.5">
-                            </div>
-                            <div class="col-md-3">
-                                <input type="number" id="nuevoPrecioHist" class="form-control" placeholder="17.000">
-                            </div>
-                            <div class="col-md-2">
-                                <button class="btn btn-danger w-100" onclick="agregarCorte()">+ Agregar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+DB_NAME = 'carniceria.db'
 
-                <!-- Tabla de Cortes -->
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">Cortes Registrados</h5>
-                        <div class="table-responsive">
-                            <table class="table table-striped align-middle" id="tablaCortes">
-                                <thead>
-                                    <tr>
-                                        <th>Corte</th>
-                                        <th>Oferta ⭐</th>
-                                        <th>Kilos</th>
-                                        <th>Costo Calc. ($/kg)</th>
-                                        <th>Precio Sugerido ($)</th>
-                                        <th>Modificar Precio ($)</th>
-                                        <th>Precio Final Venta ($)</th>
-                                        <th>Margen Real (%)</th>
-                                        <th>Estructura (%)</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
-                        <button class="btn btn-success mt-3" onclick="guardarCambios()"><i class="fa-solid fa-floppy-disk me-2"></i> Guardar Cambios</button>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
+def get_db_connection():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    <script>
-        let cortesData = [];
+def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            nombre_negocio TEXT,
+            datos_contacto TEXT,
+            logo TEXT,
+            precio_media_res TEXT,
+            kilos_media_res TEXT,
+            margen_deseado TEXT,
+            cant_semanal TEXT,
+            vencimiento TEXT,
+            activo INTEGER DEFAULT 1,
+            es_admin INTEGER DEFAULT 0
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cortes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            tipo TEXT DEFAULT 'vacuna',
+            nombre TEXT,
+            kilos REAL,
+            precio_hist REAL,
+            precio_mod REAL,
+            oferta INTEGER
+        )
+    ''')
 
-        async function cargarDatos() {
-            const res = await fetch('/api/data?tipo=vacuna');
-            const data = await res.json();
-            if (data.params) {
-                document.getElementById('precioMediaRes').value = data.params.precio_media_res || 10000;
-                document.getElementById('kilosMediaRes').value = data.params.kilos_media_res || 92;
-                document.getElementById('margenDeseadoGen').value = data.params.margen_deseado || 40;
-            }
-            cortesData = data.cortes || [];
-            calcularTodo();
+    cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute("""
+            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
+    else:
+        cursor.execute("UPDATE usuarios SET password = '1234', es_admin = 1, activo = 1 WHERE username = 'admin'")
+
+    conn.commit()
+    conn.close()
+
+def cargar_cortes_iniciales_si_necesario(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'vacuna'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_vacuna = [
+            ("MATAMBRE", 1.495, 20000, 0, 0),
+            ("PALETA", 3.855, 14500, 22000, 1),
+            ("FALDA", 5.020, 7500, 13000, 0),
+            ("COSTILLA / ASADO", 7.095, 14000, 23000, 1),
+            ("COSTELETA", 7.470, 14000, 20000, 0),
+            ("VACIO", 2.445, 14000, 23000, 0),
+            ("TAPA DE ASADO", 1.710, 14000, 23000, 0),
+            ("PUCHERO ESPECIAL", 5.140, 8500, 11000, 0),
+            ("PUCHERO COMUN", 4.325, 6500, 7900, 0),
+            ("GRASA", 6.885, 3500, 3500, 0),
+            ("MOLIDA ESPECIAL", 5.670, 14500, 22000, 1),
+            ("MOLIDA COMUN", 4.725, 7900, 11000, 0),
+            ("BLANDO ESPECIAL", 10.035, 16000, 26000, 0),
+            ("LOMO", 1.520, 17000, 26000, 0),
+            ("CUADRIL", 2.935, 17000, 26000, 0),
+            ("PECETO", 1.505, 17000, 26000, 0),
+            ("AGUJAS", 8.580, 7500, 13000, 0),
+            ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
+        ]
+        for c in cortes_vacuna:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'vacuna', ?, ?, ?, ?, ?)", 
+                           (user_id, c[0], c[1], c[2], c[3], c[4]))
+
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'cerdo'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_cerdo = [
+            ("BLANDO DE CERDO", 7.405, 12000, 16000, 1),
+            ("BONDIOLA DE CERDO", 2.255, 12000, 16000, 1),
+            ("CHORIZO DE CERDO", 8.750, 10000, 13000, 1),
+            ("GRASA DE CERDO", 5.030, 4500, 5900, 0),
+            ("COSTELETA DE CERDO", 5.705, 8990, 10000, 1),
+            ("VACIO DE CERDO", 2.040, 10000, 13000, 1),
+            ("COSTILLA DE CERDO", 4.630, 9000, 10000, 1),
+            ("MATAMBRE DE CERDO", 1.550, 15900, 18000, 1)
+        ]
+        for c in cortes_cerdo:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'cerdo', ?, ?, ?, ?, ?)", 
+                           (user_id, c[0], c[1], c[2], c[3], c[4]))
+        
+        conn.commit()
+    conn.close()
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", (username, password))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            user_id, uname, negocio, vencimiento, activo, es_admin = user
+            if activo == 0:
+                error = 'Su cuenta se encuentra desactivada.'
+            else:
+                session['user_id'] = user_id
+                session['username'] = uname
+                session['es_admin'] = es_admin
+                cargar_cortes_iniciales_si_necesario(user_id)
+                return redirect(url_for('index'))
+        else:
+            error = 'Usuario o contraseña incorrectos.'
+            
+    return render_template('login.html', error=error)
+
+@app.route('/admin/licencias')
+def admin_licencias():
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
+    clientes = cursor.fetchall()
+    conn.close()
+    
+    return render_template('admin_licencias.html', clientes=clientes)
+
+@app.route('/admin/crear-cliente', methods=['POST'])
+def crear_cliente():
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    username = request.form.get('username') or request.form.get('usuario')
+    password = request.form.get('password')
+    negocio = request.form.get('negocio') or request.form.get('nombre_negocio')
+    vencimiento = request.form.get('vencimiento') or '2026-12-31'
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+        """, (username, password, negocio, 'Av. San Martín 1234', '', '10.000', '92', '40', '16', vencimiento))
+        conn.commit()
+    except Exception as e:
+        print("Error al crear cliente:", e)
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
+
+@app.route('/admin/toggle/<int:id>')
+def toggle_cliente(id):
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
+
+@app.route('/admin/eliminar/<int:id>')
+def eliminar_cliente(id):
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM cortes WHERE user_id = ?", (id,))
+    cursor.execute("DELETE FROM usuarios WHERE id = ? AND es_admin = 0", (id,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/')
+def index():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('index.html', es_admin=session.get('es_admin', 0), active_page='vacuna_precios')
+
+@app.route('/desposte')
+def desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('desposte.html', es_admin=session.get('es_admin', 0), active_page='vacuna_desposte')
+
+@app.route('/cerdo')
+def cerdo():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo.html', es_admin=session.get('es_admin', 0), active_page='cerdo_precios')
+
+@app.route('/cerdo/desposte')
+def cerdo_desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo_desposte.html', es_admin=session.get('es_admin', 0), active_page='cerdo_desposte')
+
+@app.route('/empresa')
+def empresa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('empresa.html', es_admin=session.get('es_admin', 0), active_page='empresa')
+
+@app.route('/api/data', methods=['GET'])
+def get_data():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+        
+    user_id = session['user_id']
+    tipo = request.args.get('tipo', 'vacuna')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", (user_id,))
+    user_row = cursor.fetchone()
+    
+    params = {}
+    empresa = {'nombre': 'CARNICERÍA', 'datos': '', 'logo': ''}
+    
+    if user_row:
+        empresa = {
+            'nombre': user_row[0] or 'CARNICERÍA',
+            'datos': user_row[1] or '',
+            'logo': user_row[2] or ''
+        }
+        params = {
+            'precio_media_res': user_row[3] or '10.000',
+            'kilos_media_res': user_row[4] or '92',
+            'margen_deseado': user_row[5] or '40',
+            'cant_semanal': user_row[6] or '16'
         }
 
-        function calcularTodo() {
-            const precioMediaRes = parseFloat(document.getElementById('precioMediaRes').value) || 0;
-            const kilosMediaRes = parseFloat(document.getElementById('kilosMediaRes').value) || 1;
-            const margenGen = parseFloat(document.getElementById('margenDeseadoGen').value) || 0;
-            const costoKiloPromedio = precioMediaRes / kilosMediaRes;
+    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ? AND tipo = ?", (user_id, tipo))
+    cortes_rows = cursor.fetchall()
+    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in cortes_rows]
+    
+    conn.close()
+    return jsonify({'cortes': cortes, 'params': params, 'empresa': empresa})
 
-            let totalKilos = 0;
-            cortesData.forEach(c => totalKilos += parseFloat(c.kilos) || 0);
+@app.route('/api/save', methods=['POST'])
+def save_data():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+        
+    user_id = session['user_id']
+    tipo = request.args.get('tipo', 'vacuna')
+    data = request.json or {}
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if 'params' in data:
+        p = data['params']
+        precio = p.get('precioMediaRes') or p.get('precio_media_res') or '10.000'
+        kilos = p.get('kilosMediaRes') or p.get('kilos_media_res') or '92'
+        margen = p.get('margenDeseadoGen') or p.get('margenDeseado') or p.get('margen_deseado') or '40'
+        cant = p.get('cantSemanal') or p.get('cant_semanal') or '16'
+        
+        cursor.execute("""
+            UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
+        """, (str(precio), str(kilos), str(margen), str(cant), user_id))
+        
+    if 'empresa' in data:
+        e = data['empresa']
+        nombre = e.get('nombre') or e.get('nombre_negocio') or 'CARNICERÍA'
+        datos = e.get('datos') or e.get('datos_contacto') or ''
+        logo = e.get('logo') or ''
+        
+        cursor.execute("""
+            UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
+        """, (str(nombre), str(datos), str(logo), user_id))
+        
+    if 'cortes' in data:
+        cursor.execute("DELETE FROM cortes WHERE user_id = ? AND tipo = ?", (user_id, tipo))
+        for c in data['cortes']:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (user_id, tipo, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))))
+                           
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success'})
 
-            const mermaKg = kilosMediaRes - totalKilos;
-            const mermaPorc = kilosMediaRes > 0 ? (mermaKg / kilosMediaRes) * 100 : 0;
+@app.route('/api/upload-logo', methods=['POST'])
+def upload_logo():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+        
+    user_id = session['user_id']
+    if 'logo' not in request.files:
+        return jsonify({'status': 'error', 'message': 'No file part'})
+    file = request.files['logo']
+    if file.filename == '':
+        return jsonify({'status': 'error', 'message': 'No selected file'})
+    if file:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        logo_url = f'/{filepath}'
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
+        cursor.commit()
+        conn.close()
 
-            document.getElementById('totalKilosCortes').value = `${totalKilos.toFixed(3)} kg`;
-            document.getElementById('mermaKilos').value = `${mermaKg.toFixed(3)} kg (${mermaPorc.toFixed(2)}%)`;
+        return jsonify({'status': 'success', 'logo': logo_url})
 
-            const tbody = document.querySelector('#tablaCortes tbody');
-            tbody.innerHTML = '';
+init_db()
 
-            cortesData.forEach((corte, index) => {
-                const costoCalc = corte.kilos * costoKiloPromedio;
-                const precioSugerido = costoCalc * (1 + (margenGen / 100));
-                const precioFinal = corte.precio_mod > 0 ? corte.precio_mod : precioSugerido;
-                const margenReal = costoCalc > 0 ? ((precioFinal - costoCalc) / costoCalc) * 100 : 0;
-                const estructura = kilosMediaRes > 0 ? (corte.kilos / kilosMediaRes) * 100 : 0;
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${corte.nombre}</strong></td>
-                    <td><input type="checkbox" ${corte.oferta ? 'checked' : ''} onchange="toggleOferta(${index})"></td>
-                    <td><input type="number" step="0.001" class="form-control form-control-sm" value="${corte.kilos}" oninput="actualizarKilos(${index}, this.value)"></td>
-                    <td>$${costoCalc.toFixed(2)}</td>
-                    <td>$${precioSugerido.toFixed(2)}</td>
-                    <td><input type="number" class="form-control form-control-sm" value="${corte.precio_mod}" oninput="actualizarModificado(${index}, this.value)"></td>
-                    <td><strong>$${precioFinal.toFixed(2)}</strong></td>
-                    <td class="${margenReal >= 0 ? 'text-success' : 'text-danger'} fw-bold">${margenReal.toFixed(1)}%</td>
-                    <td>${estructura.toFixed(2)}%</td>
-                    <td><button class="btn btn-sm btn-outline-danger" onclick="eliminarCorte(${index})"><i class="fa-solid fa-trash"></i></button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function actualizarKilos(index, val) {
-            cortesData[index].kilos = parseFloat(val) || 0;
-            calcularTodo();
-        }
-
-        function actualizarModificado(index, val) {
-            cortesData[index].precio_mod = parseFloat(val) || 0;
-            calcularTodo();
-        }
-
-        function toggleOferta(index) {
-            cortesData[index].oferta = cortesData[index].oferta ? 0 : 1;
-        }
-
-        function agregarCorte() {
-            const nombre = document.getElementById('nuevoNombre').value.trim();
-            const kilos = parseFloat(document.getElementById('nuevoKilos').value);
-            const precioHist = parseFloat(document.getElementById('nuevoPrecioHist').value) || 0;
-
-            if (!nombre || isNaN(kilos)) {
-                alert('Complete el nombre y los kilos correctamente.');
-                return;
-            }
-
-            cortesData.push({ nombre, kilos, precio_hist: precioHist, precio_mod: 0, oferta: 0 });
-            document.getElementById('nuevoNombre').value = '';
-            document.getElementById('nuevoKilos').value = '';
-            document.getElementById('nuevoPrecioHist').value = '';
-            calcularTodo();
-        }
-
-        function eliminarCorte(index) {
-            cortesData.splice(index, 1);
-            calcularTodo();
-        }
-
-        async function guardarCambios() {
-            const params = {
-                precioMediaRes: document.getElementById('precioMediaRes').value,
-                kilosMediaRes: document.getElementById('kilosMediaRes').value,
-                margenDeseadoGen: document.getElementById('margenDeseadoGen').value
-            };
-
-            const response = await fetch('/api/save?tipo=vacuna', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ params, cortes: cortesData })
-            });
-
-            if (response.ok) {
-                alert('¡Cambios de Carne Vacuna guardados con éxito!');
-            } else {
-                alert('Error al guardar los cambios.');
-            }
-        }
-
-        cargarDatos();
-    </script>
-</body>
-</html>
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
