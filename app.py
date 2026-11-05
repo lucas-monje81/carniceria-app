@@ -342,7 +342,7 @@ def upload_logo():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
-        cursor.commit()
+        conn.commit()
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
