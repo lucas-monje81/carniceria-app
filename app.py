@@ -214,37 +214,35 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# Rutas de Carne Vacuna
 @app.route('/')
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html', es_admin=session.get('es_admin', 0))
+    return render_template('index.html', es_admin=session.get('es_admin', 0), active_page='vacuna_precios')
 
 @app.route('/desposte')
 def desposte():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('desposte.html', es_admin=session.get('es_admin', 0))
+    return render_template('desposte.html', es_admin=session.get('es_admin', 0), active_page='vacuna_desposte')
 
-# Rutas de Carne Cerdo
 @app.route('/cerdo')
 def cerdo():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('cerdo.html', es_admin=session.get('es_admin', 0))
+    return render_template('cerdo.html', es_admin=session.get('es_admin', 0), active_page='cerdo_precios')
 
 @app.route('/cerdo/desposte')
 def cerdo_desposte():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('cerdo_desposte.html', es_admin=session.get('es_admin', 0))
+    return render_template('cerdo_desposte.html', es_admin=session.get('es_admin', 0), active_page='cerdo_desposte')
 
 @app.route('/empresa')
 def empresa():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('empresa.html', es_admin=session.get('es_admin', 0))
+    return render_template('empresa.html', es_admin=session.get('es_admin', 0), active_page='empresa')
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
@@ -344,7 +342,7 @@ def upload_logo():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
-        conn.commit()
+        cursor.commit()
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
