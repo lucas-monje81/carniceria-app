@@ -178,6 +178,20 @@ def toggle_cliente(id):
     
     return redirect(url_for('admin_licencias'))
 
+@app.route('/admin/eliminar/<int:id>')
+def eliminar_cliente(id):
+    if 'user_id' not in session or not session.get('es_admin'):
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM cortes WHERE user_id = ?", (id,))
+    cursor.execute("DELETE FROM usuarios WHERE id = ? AND es_admin = 0", (id,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('admin_licencias'))
+
 @app.route('/logout')
 def logout():
     session.clear()
@@ -285,7 +299,7 @@ def upload_logo():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
-        conn.commit()
+        cursor.execute("COMMIT")
         conn.close()
 
         return jsonify({'status': 'success', 'logo': logo_url})
