@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datos de la Empresa</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .sidebar { min-height: 100vh; background-color: #1a1d20; color: white; }
+        .sidebar a { color: #adb5bd; text-decoration: none; padding: 10px 15px; display: block; border-radius: 5px; margin-bottom: 5px; }
+        .sidebar a:hover, .sidebar a.active { color: white; background-color: #dc3545; }
+        .card { border: none; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075); }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Menú Lateral -->
+            <nav class="col-md-2 d-none d-md-block sidebar p-3">
+                <h4 class="text-white mb-4"><i class="fa-solid fa-drumstick-bite"></i> Carnicería App</h4>
+                <ul class="nav flex-column">
+                    <li class="nav-item mb-1 text-muted small px-3"><strong>CARNE VACUNA</strong></li>
+                    <li class="nav-item ms-2"><a href="/" class="nav-link {% if active_page == 'vacuna_precios' %}active{% endif %}"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
+                    <li class="nav-item ms-2"><a href="/desposte" class="nav-link {% if active_page == 'vacuna_desposte' %}active{% endif %}"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item ms-2"><a href="#" class="nav-link"><i class="fa-solid fa-list me-2"></i> Lista</a></li>
+                    <li class="nav-item ms-2 mb-3"><a href="#" class="nav-link"><i class="fa-solid fa-tags me-2"></i> Carteles</a></li>
+                    
+                    <li class="nav-item mb-1 text-muted small px-3"><strong>CARNE CERDO</strong></li>
+                    <li class="nav-item ms-2"><a href="/cerdo" class="nav-link {% if active_page == 'cerdo_precios' %}active{% endif %}"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
+                    <li class="nav-item ms-2"><a href="/cerdo/desposte" class="nav-link {% if active_page == 'cerdo_desposte' %}active{% endif %}"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item ms-2"><a href="#" class="nav-link"><i class="fa-solid fa-list me-2"></i> Lista</a></li>
+                    <li class="nav-item ms-2 mb-3"><a href="#" class="nav-link"><i class="fa-solid fa-tags me-2"></i> Carteles</a></li>
+
+                    <li class="nav-item mt-2"><a href="/empresa" class="nav-link {% if active_page == 'empresa' %}active{% endif %}"><i class="fa-solid fa-building me-2"></i> Empresa</a></li>
+                    <li class="nav-item"><a href="/admin/licencias" class="nav-link {% if not es_admin %}d-none{% endif %}"><i class="fa-solid fa-key me-2"></i> Licencias (Admin)</a></li>
+                </ul>
+                <div class="mt-auto pt-5">
+                    <a href="/logout" class="btn btn-danger w-100"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</a>
+                </div>
+            </nav>
+
+            <!-- Contenido Principal -->
+            <main class="col-md-10 ms-sm-auto px-md-4 py-4">
+                <h2 class="mb-4">Datos de la Empresa / Negocio</h2>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Negocio / Empresa</label>
+                            <input type="text" id="nombreNegocio" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Datos de Contacto (Dirección, Teléfono, etc.)</label>
+                            <input type="text" id="datosContacto" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Logo del Negocio (Imagen)</label>
+                            <input type="file" id="logoFile" class="form-control mb-2">
+                            <div id="logoPreview"></div>
+                        </div>
+                        <button class="btn btn-success" onclick="guardarEmpresa()"><i class="fa-solid fa-floppy-disk me-2"></i> Guardar Cambios</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        async function cargarEmpresa() {
+            const res = await fetch('/api/data?tipo=vacuna');
+            const data = await res.json();
+            if (data.empresa) {
+                document.getElementById('nombreNegocio').value = data.empresa.nombre || '';
+                document.getElementById('datosContacto').value = data.empresa.datos || '';
+                if (data.empresa.logo) {
+                    document.getElementById('logoPreview').innerHTML = `<img src="${data.empresa.logo}" alt="Logo" style="max-height: 100px;" class="mt-2 border p-1">`;
+                }
+            }
+        }
+
+        async function guardarEmpresa() {
+            const empresa = {
+                nombre: document.getElementById('nombreNegocio').value,
+                datos: document.getElementById('datosContacto').value
+            };
+
+            const fileInput = document.getElementById('logoFile');
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('logo', fileInput.files[0]);
+                const uploadRes = await fetch('/api/upload-logo', { method: 'POST', body: formData });
+                const uploadData = await uploadRes.json();
+                if (uploadData.status === 'success') { empresa.logo = uploadData.logo; }
+            }
+
+            const response = await fetch('/api/save?tipo=vacuna', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ empresa })
+            });
+
+            if (response.ok) { alert('¡Datos de empresa guardados!'); cargarEmpresa(); }
+            else { alert('Error al guardar.'); }
+        }
+        cargarEmpresa();
+    </script>
+</body>
+</html>
