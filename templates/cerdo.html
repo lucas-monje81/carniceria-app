@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión - Carne Cerdo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .sidebar { min-height: 100vh; background-color: #1a1d20; color: white; }
+        .sidebar a { color: #adb5bd; text-decoration: none; padding: 10px 15px; display: block; border-radius: 5px; margin-bottom: 5px; }
+        .sidebar a:hover, .sidebar a.active { color: white; background-color: #dc3545; }
+        .card { border: none; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075); }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Menú Lateral -->
+            <nav class="col-md-2 d-none d-md-block sidebar p-3">
+                <h4 class="text-white mb-4"><i class="fa-solid fa-drumstick-bite"></i> Carnicería App</h4>
+                <ul class="nav flex-column">
+                    <li class="nav-item"><a href="/" class="nav-link"><i class="fa-solid fa-cow me-2"></i> Carne Vacuna</a></li>
+                    <li class="nav-item"><a href="/cerdo" class="nav-link active"><i class="fa-solid fa-piggy-bank me-2"></i> Carne Cerdo</a></li>
+                    <li class="nav-item"><a href="/admin/licencias" class="nav-link {% if not es_admin %}d-none{% endif %}"><i class="fa-solid fa-key me-2"></i> Licencias (Admin)</a></li>
+                </ul>
+                <div class="mt-auto pt-5">
+                    <a href="/logout" class="btn btn-danger w-100"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</a>
+                </div>
+            </nav>
+
+            <!-- Contenido Principal -->
+            <main class="col-md-10 ms-sm-auto px-md-4 py-4">
+                <h2 class="mb-4">Configuración y Precios - Carne Cerdo</h2>
+
+                <!-- Parámetros Generales -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">Parámetros Generales</h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Costo Total Cerdo ($)</label>
+                                <input type="number" id="precioMediaRes" class="form-control" value="10000" oninput="calcularTodo()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Kilos Totales</label>
+                                <input type="number" id="kilosMediaRes" class="form-control" value="92" oninput="calcularTodo()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Margen Deseado (%)</label>
+                                <input type="number" id="margenDeseadoGen" class="form-control" value="40" oninput="calcularTodo()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Cantidad Semanal</label>
+                                <input type="number" id="cantSemanal" class="form-control" value="16" oninput="calcularTodo()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agregar Corte -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">Agregar Nuevo Corte</h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" id="nuevoNombre" class="form-control" placeholder="Nombre del corte">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" step="0.001" id="nuevoKilos" class="form-control" placeholder="Kilos">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" id="nuevoPrecioHist" class="form-control" placeholder="Precio Base ($)">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-danger w-100" onclick="agregarCorte()">+ Agregar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Cortes -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">Detalle de Cortes de Cerdo</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle" id="tablaCortes">
+                                <thead>
+                                    <tr>
+                                        <th>Corte</th>
+                                        <th>Oferta ⭐</th>
+                                        <th>Costo Calc. ($/kg)</th>
+                                        <th>Precio Sugerido ($)</th>
+                                        <th>Modificar Precio ($)</th>
+                                        <th>Precio Final Venta ($)</th>
+                                        <th>Margen Real (%)</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-success mt-3" onclick="guardarCambios()"><i class="fa-solid fa-floppy-disk me-2"></i> Guardar Cambios</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        let cortesData = [];
+
+        async function cargarDatos() {
+            const res = await fetch('/api/data?tipo=cerdo');
+            const data = await res.json();
+            if (data.params) {
+                document.getElementById('precioMediaRes').value = data.params.precio_media_res || 10000;
+                document.getElementById('kilosMediaRes').value = data.params.kilos_media_res || 92;
+                document.getElementById('margenDeseadoGen').value = data.params.margen_deseado || 40;
+                document.getElementById('cantSemanal').value = data.params.cant_semanal || 16;
+            }
+            cortesData = data.cortes || [];
+            calcularTodo();
+        }
+
+        function calcularTodo() {
+            const costoTotal = parseFloat(document.getElementById('precioMediaRes').value) || 0;
+            const kilosTotal = parseFloat(document.getElementById('kilosMediaRes').value) || 1;
+            const margenGen = parseFloat(document.getElementById('margenDeseadoGen').value) || 0;
+            const costoKiloPromedio = costoTotal / kilosTotal;
+
+            const tbody = document.querySelector('#tablaCortes tbody');
+            tbody.innerHTML = '';
+
+            cortesData.forEach((corte, index) => {
+                const costoCalc = corte.kilos * costoKiloPromedio;
+                const precioSugerido = costoCalc * (1 + (margenGen / 100));
+                const precioFinal = corte.precio_mod > 0 ? corte.precio_mod : precioSugerido;
+                const margenReal = costoCalc > 0 ? ((precioFinal - costoCalc) / costoCalc) * 100 : 0;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${corte.nombre}</strong><br><small class="text-muted">${corte.kilos} kg</small></td>
+                    <td><input type="checkbox" ${corte.oferta ? 'checked' : ''} onchange="toggleOferta(${index})"></td>
+                    <td>$${costoCalc.toFixed(2)}</td>
+                    <td>$${precioSugerido.toFixed(2)}</td>
+                    <td><input type="number" class="form-control form-control-sm" value="${corte.precio_mod}" oninput="actualizarModificado(${index}, this.value)"></td>
+                    <td><strong>$${precioFinal.toFixed(2)}</strong></td>
+                    <td class="${margenReal >= 0 ? 'text-success' : 'text-danger'} fw-bold">${margenReal.toFixed(1)}%</td>
+                    <td><button class="btn btn-sm btn-outline-danger" onclick="eliminarCorte(${index})"><i class="fa-solid fa-trash"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function actualizarModificado(index, val) {
+            cortesData[index].precio_mod = parseFloat(val) || 0;
+            calcularTodo();
+        }
+
+        function toggleOferta(index) {
+            cortesData[index].oferta = cortesData[index].oferta ? 0 : 1;
+        }
+
+        function agregarCorte() {
+            const nombre = document.getElementById('nuevoNombre').value.trim();
+            const kilos = parseFloat(document.getElementById('nuevoKilos').value);
+            const precioHist = parseFloat(document.getElementById('nuevoPrecioHist').value) || 0;
+
+            if (!nombre || isNaN(kilos)) {
+                alert('Complete el nombre y los kilos correctamente.');
+                return;
+            }
+
+            cortesData.push({ nombre, kilos, precio_hist: precioHist, precio_mod: 0, oferta: 0 });
+            document.getElementById('nuevoNombre').value = '';
+            document.getElementById('nuevoKilos').value = '';
+            document.getElementById('nuevoPrecioHist').value = '';
+            calcularTodo();
+        }
+
+        function eliminarCorte(index) {
+            cortesData.splice(index, 1);
+            calcularTodo();
+        }
+
+        async function guardarCambios() {
+            const params = {
+                precioMediaRes: document.getElementById('precioMediaRes').value,
+                kilosMediaRes: document.getElementById('kilosMediaRes').value,
+                margenDeseadoGen: document.getElementById('margenDeseadoGen').value,
+                cantSemanal: document.getElementById('cantSemanal').value
+            };
+
+            const response = await fetch('/api/save?tipo=cerdo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ params, cortes: cortesData })
+            });
+
+            if (response.ok) {
+                alert('¡Cambios de Carne Cerdo guardados con éxito!');
+            } else {
+                alert('Error al guardar los cambios.');
+            }
+        }
+
+        cargarDatos();
+    </script>
+</body>
+</html>
