@@ -120,14 +120,13 @@ def login():
         user = cursor.fetchone()
         conn.close()
         if user:
-            user_id, uname, negocio, vencimiento, activo, es_admin = user[0], user[1], user[2], user[3], user[4], user[5]
-            if activo == 0:
+            if user[4] == 0:
                 error = 'Su cuenta se encuentra desactivada.'
             else:
-                session['user_id'] = user_id
-                session['username'] = uname
-                session['es_admin'] = es_admin
-                cargar_cortes_iniciales_si_necesario(user_id)
+                session['user_id'] = user[0]
+                session['username'] = user[1]
+                session['es_admin'] = user[5]
+                cargar_cortes_iniciales_si_necesario(user[0])
                 return redirect(url_for('index'))
         else:
             error = 'Usuario o contraseña incorrectos.'
@@ -233,14 +232,15 @@ def get_data():
     cursor = conn.cursor()
     cursor.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", (user_id,))
     user_row = cursor.fetchone()
+    
     params = {}
     empresa = {'nombre': 'CARNICERÍA', 'datos': '', 'logo': ''}
+    
     if user_row:
         empresa = {
-            'nombre': user_row[0] or 'CARNICERÍA',
-            'datos': user_row[1] or '',
-            'logo': user_row[2] or ''
+            'nombre': user_row[0] if user_row[0] is not None else 'CARNICERÍA',
+            'datos': user_row[1] if user_row[1] is not None else '',
+            'logo': user_row[2] if user_row[2] is not None else ''
         }
         params = {
-            'precio_media_res': user_row[3] or '10.000',
-            'kilos_media_res': user_row[4] or '92',
+            'precio_media_res': user_row[3] if user_row[3] is not None else '10.000',
