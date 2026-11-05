@@ -72,7 +72,6 @@ def cargar_cortes_iniciales_si_necesario(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Verificar cortes vacunos
     cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'vacuna'", (user_id,))
     if cursor.fetchone()[0] == 0:
         cortes_vacuna = [
@@ -99,7 +98,6 @@ def cargar_cortes_iniciales_si_necesario(user_id):
             cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'vacuna', ?, ?, ?, ?, ?)", 
                            (user_id, c[0], c[1], c[2], c[3], c[4]))
 
-    # Verificar cortes de cerdo
     cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'cerdo'", (user_id,))
     if cursor.fetchone()[0] == 0:
         cortes_cerdo = [
@@ -216,17 +214,37 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# Rutas de Carne Vacuna
 @app.route('/')
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return render_template('index.html', es_admin=session.get('es_admin', 0))
 
+@app.route('/desposte')
+def desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('desposte.html', es_admin=session.get('es_admin', 0))
+
+# Rutas de Carne Cerdo
 @app.route('/cerdo')
 def cerdo():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return render_template('cerdo.html', es_admin=session.get('es_admin', 0))
+
+@app.route('/cerdo/desposte')
+def cerdo_desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo_desposte.html', es_admin=session.get('es_admin', 0))
+
+@app.route('/empresa')
+def empresa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('empresa.html', es_admin=session.get('es_admin', 0))
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
