@@ -9,7 +9,6 @@ app.secret_key = 'clave_secreta_super_segura_para_sesiones'
 
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -23,58 +22,53 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            nombre_negocio TEXT,
-            datos_contacto TEXT,
-            logo TEXT,
-            precio_media_res TEXT,
-            kilos_media_res TEXT,
-            margen_deseado TEXT,
-            cant_semanal TEXT,
-            vencimiento TEXT,
-            activo INTEGER DEFAULT 1,
-            es_admin INTEGER DEFAULT 0
-        )
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        nombre_negocio TEXT,
+        datos_contacto TEXT,
+        logo TEXT,
+        precio_media_res TEXT,
+        kilos_media_res TEXT,
+        margen_deseado TEXT,
+        cant_semanal TEXT,
+        vencimiento TEXT,
+        activo INTEGER DEFAULT 1,
+        es_admin INTEGER DEFAULT 0
+    )
     ''')
-    
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS cortes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            nombre TEXT,
-            kilos REAL,
-            precio_hist REAL,
-            precio_mod REAL,
-            oferta INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS cortes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        tipo TEXT DEFAULT 'vacuna',
+        nombre TEXT,
+        kilos REAL,
+        precio_hist REAL,
+        precio_mod REAL,
+        oferta INTEGER
+    )
     ''')
-
     cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
     row = cursor.fetchone()
     if not row:
         cursor.execute("""
-            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, ('admin', '1234', 'ADMINISTRADOR GENERAL', 'Av. San Martín 1234 - Tel: 351-1234567', '', '10.000', '92', '40', '16', '2099-12-31', 1, 1))
     else:
         cursor.execute("UPDATE usuarios SET password = '1234', es_admin = 1, activo = 1 WHERE username = 'admin'")
-
     conn.commit()
     conn.close()
 
 def cargar_cortes_iniciales_si_necesario(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ?", (user_id,))
-    count = cursor.fetchone()[0]
-    
-    if count == 0:
-        cortes_iniciales = [
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'vacuna'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_vacuna = [
             ("MATAMBRE", 1.495, 20000, 0, 0),
             ("PALETA", 3.855, 14500, 22000, 1),
             ("FALDA", 5.020, 7500, 13000, 0),
@@ -94,10 +88,24 @@ def cargar_cortes_iniciales_si_necesario(user_id):
             ("AGUJAS", 8.580, 7500, 13000, 0),
             ("TAPA CUADRIL", 0.920, 16000, 26000, 0)
         ]
-        for c in cortes_iniciales:
-            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)", 
-                           (user_id, c[0], c[1], c[2], c[3], c[4]))
-        conn.commit()
+        for c in cortes_vacuna:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'vacuna', ?, ?, ?, ?, ?)", (user_id, c[0], c[1], c[2], c[3], c[4]))
+
+    cursor.execute("SELECT COUNT(*) FROM cortes WHERE user_id = ? AND tipo = 'cerdo'", (user_id,))
+    if cursor.fetchone()[0] == 0:
+        cortes_cerdo = [
+            ("BLANDO DE CERDO", 7.405, 12000, 16000, 1),
+            ("BONDIOLA DE CERDO", 2.255, 12000, 16000, 1),
+            ("CHORIZO DE CERDO", 8.750, 10000, 13000, 1),
+            ("GRASA DE CERDO", 5.030, 4500, 5900, 0),
+            ("COSTELETA DE CERDO", 5.705, 8990, 10000, 1),
+            ("VACIO DE CERDO", 2.040, 10000, 13000, 1),
+            ("COSTILLA DE CERDO", 4.630, 9000, 10000, 1),
+            ("MATAMBRE DE CERDO", 1.550, 15900, 18000, 1)
+        ]
+        for c in cortes_cerdo:
+            cursor.execute("INSERT INTO cortes (user_id, tipo, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, 'cerdo', ?, ?, ?, ?, ?)", (user_id, c[0], c[1], c[2], c[3], c[4]))
+    conn.commit()
     conn.close()
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -106,13 +114,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo, es_admin FROM usuarios WHERE username = ? AND password = ?", (username, password))
         user = cursor.fetchone()
         conn.close()
-        
         if user:
             user_id, uname, negocio, vencimiento, activo, es_admin = user
             if activo == 0:
@@ -125,71 +131,61 @@ def login():
                 return redirect(url_for('index'))
         else:
             error = 'Usuario o contraseña incorrectos.'
-            
     return render_template('login.html', error=error)
 
 @app.route('/admin/licencias')
 def admin_licencias():
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
-        
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, nombre_negocio, vencimiento, activo FROM usuarios WHERE es_admin = 0")
     clientes = cursor.fetchall()
     conn.close()
-    
     return render_template('admin_licencias.html', clientes=clientes)
 
 @app.route('/admin/crear-cliente', methods=['POST'])
 def crear_cliente():
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
-        
     username = request.form.get('username') or request.form.get('usuario')
     password = request.form.get('password')
     negocio = request.form.get('negocio') or request.form.get('nombre_negocio')
     vencimiento = request.form.get('vencimiento') or '2026-12-31'
-    
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+        INSERT INTO usuarios (username, password, nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal, vencimiento, activo, es_admin)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
         """, (username, password, negocio, 'Av. San Martín 1234', '', '10.000', '92', '40', '16', vencimiento))
         conn.commit()
     except Exception as e:
         print("Error al crear cliente:", e)
     conn.close()
-    
     return redirect(url_for('admin_licencias'))
 
 @app.route('/admin/toggle/<int:id>')
 def toggle_cliente(id):
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
-        
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE usuarios SET activo = CASE WHEN activo = 1 THEN 0 ELSE 1 END WHERE id = ?", (id,))
     conn.commit()
     conn.close()
-    
     return redirect(url_for('admin_licencias'))
 
 @app.route('/admin/eliminar/<int:id>')
 def eliminar_cliente(id):
     if 'user_id' not in session or not session.get('es_admin'):
         return redirect(url_for('login'))
-        
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM cortes WHERE user_id = ?", (id,))
     cursor.execute("DELETE FROM usuarios WHERE id = ? AND es_admin = 0", (id,))
     conn.commit()
     conn.close()
-    
     return redirect(url_for('admin_licencias'))
 
 @app.route('/logout')
@@ -201,23 +197,44 @@ def logout():
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html', es_admin=session.get('es_admin', 0))
+    return render_template('index.html', es_admin=session.get('es_admin', 0), active_page='vacuna_precios')
+
+@app.route('/desposte')
+def desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('desposte.html', es_admin=session.get('es_admin', 0), active_page='vacuna_desposte')
+
+@app.route('/cerdo')
+def cerdo():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo.html', es_admin=session.get('es_admin', 0), active_page='cerdo_precios')
+
+@app.route('/cerdo/desposte')
+def cerdo_desposte():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('cerdo_desposte.html', es_admin=session.get('es_admin', 0), active_page='cerdo_desposte')
+
+@app.route('/empresa')
+def empresa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('empresa.html', es_admin=session.get('es_admin', 0), active_page='empresa')
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
-        
     user_id = session['user_id']
+    tipo = request.args.get('tipo', 'vacuna')
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     cursor.execute("SELECT nombre_negocio, datos_contacto, logo, precio_media_res, kilos_media_res, margen_deseado, cant_semanal FROM usuarios WHERE id = ?", (user_id,))
     user_row = cursor.fetchone()
-    
     params = {}
     empresa = {'nombre': 'CARNICERÍA', 'datos': '', 'logo': ''}
-    
     if user_row:
         empresa = {
             'nombre': user_row[0] or 'CARNICERÍA',
@@ -228,84 +245,3 @@ def get_data():
             'precio_media_res': user_row[3] or '10.000',
             'kilos_media_res': user_row[4] or '92',
             'margen_deseado': user_row[5] or '40',
-            'cant_semanal': user_row[6] or '16'
-        }
-
-    cursor.execute("SELECT nombre, kilos, precio_hist, precio_mod, oferta FROM cortes WHERE user_id = ?", (user_id,))
-    cortes_rows = cursor.fetchall()
-    cortes = [{'nombre': r[0], 'kilos': r[1], 'precio_hist': r[2], 'precio_mod': r[3], 'oferta': r[4]} for r in cortes_rows]
-    
-    conn.close()
-    return jsonify({'cortes': cortes, 'params': params, 'empresa': empresa})
-
-@app.route('/api/save', methods=['POST'])
-def save_data():
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-        
-    user_id = session['user_id']
-    data = request.json or {}
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    if 'params' in data:
-        p = data['params']
-        precio = p.get('precioMediaRes') or p.get('precio_media_res') or '10.000'
-        kilos = p.get('kilosMediaRes') or p.get('kilos_media_res') or '92'
-        margen = p.get('margenDeseadoGen') or p.get('margenDeseado') or p.get('margen_deseado') or '40'
-        cant = p.get('cantSemanal') or p.get('cant_semanal') or '16'
-        
-        cursor.execute("""
-            UPDATE usuarios SET precio_media_res = ?, kilos_media_res = ?, margen_deseado = ?, cant_semanal = ? WHERE id = ?
-        """, (str(precio), str(kilos), str(margen), str(cant), user_id))
-        
-    if 'empresa' in data:
-        e = data['empresa']
-        nombre = e.get('nombre') or e.get('nombre_negocio') or 'CARNICERÍA'
-        datos = e.get('datos') or e.get('datos_contacto') or ''
-        logo = e.get('logo') or ''
-        
-        cursor.execute("""
-            UPDATE usuarios SET nombre_negocio = ?, datos_contacto = ?, logo = ? WHERE id = ?
-        """, (str(nombre), str(datos), str(logo), user_id))
-        
-    if 'cortes' in data:
-        cursor.execute("DELETE FROM cortes WHERE user_id = ?", (user_id,))
-        for c in data['cortes']:
-            cursor.execute("INSERT INTO cortes (user_id, nombre, kilos, precio_hist, precio_mod, oferta) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, str(c.get('nombre', '')), float(c.get('kilos', 0)), float(c.get('precio_hist', 0)), float(c.get('precio_mod', 0)), int(c.get('oferta', 0))))
-                           
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'success'})
-
-@app.route('/api/upload-logo', methods=['POST'])
-def upload_logo():
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-        
-    user_id = session['user_id']
-    if 'logo' not in request.files:
-        return jsonify({'status': 'error', 'message': 'No file part'})
-    file = request.files['logo']
-    if file.filename == '':
-        return jsonify({'status': 'error', 'message': 'No selected file'})
-    if file:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        logo_url = f'/{filepath}'
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE usuarios SET logo = ? WHERE id = ?", (logo_url, user_id))
-        cursor.execute("COMMIT")
-        conn.close()
-
-        return jsonify({'status': 'success', 'logo': logo_url})
-
-init_db()
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
