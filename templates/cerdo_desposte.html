@@ -22,15 +22,18 @@
                 <h4 class="text-white mb-4"><i class="fa-solid fa-drumstick-bite"></i> Carnicería App</h4>
                 <ul class="nav flex-column">
                     <li class="nav-item mb-1 text-muted small px-3"><strong>CARNE VACUNA</strong></li>
-                    <li class="nav-item ms-2"><a href="/" class="nav-link"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
-                    <li class="nav-item ms-2"><a href="/desposte" class="nav-link"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item ms-2"><a href="/" class="nav-link {% if active_page == 'vacuna_precios' %}active{% endif %}"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
+                    <li class="nav-item ms-2"><a href="/desposte" class="nav-link {% if active_page == 'vacuna_desposte' %}active{% endif %}"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item ms-2"><a href="#" class="nav-link"><i class="fa-solid fa-list me-2"></i> Lista</a></li>
+                    <li class="nav-item ms-2 mb-3"><a href="#" class="nav-link"><i class="fa-solid fa-tags me-2"></i> Carteles</a></li>
                     
-                    <li class="nav-item mt-3 mb-1 text-muted small px-3"><strong>CARNE CERDO</strong></li>
-                    <li class="nav-item ms-2"><a href="/cerdo" class="nav-link"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
-                    <li class="nav-item ms-2"><a href="/cerdo/desposte" class="nav-link active"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item mb-1 text-muted small px-3"><strong>CARNE CERDO</strong></li>
+                    <li class="nav-item ms-2"><a href="/cerdo" class="nav-link {% if active_page == 'cerdo_precios' %}active{% endif %}"><i class="fa-solid fa-dollar-sign me-2"></i> Precios</a></li>
+                    <li class="nav-item ms-2"><a href="/cerdo/desposte" class="nav-link {% if active_page == 'cerdo_desposte' %}active{% endif %}"><i class="fa-solid fa-scale-balanced me-2"></i> Desposte</a></li>
+                    <li class="nav-item ms-2"><a href="#" class="nav-link"><i class="fa-solid fa-list me-2"></i> Lista</a></li>
+                    <li class="nav-item ms-2 mb-3"><a href="#" class="nav-link"><i class="fa-solid fa-tags me-2"></i> Carteles</a></li>
 
-                    <li class="nav-item mt-3 mb-1 text-muted small px-3"><strong>GENERAL</strong></li>
-                    <li class="nav-item"><a href="/empresa" class="nav-link"><i class="fa-solid fa-building me-2"></i> Empresa</a></li>
+                    <li class="nav-item mt-2"><a href="/empresa" class="nav-link {% if active_page == 'empresa' %}active{% endif %}"><i class="fa-solid fa-building me-2"></i> Empresa</a></li>
                     <li class="nav-item"><a href="/admin/licencias" class="nav-link {% if not es_admin %}d-none{% endif %}"><i class="fa-solid fa-key me-2"></i> Licencias (Admin)</a></li>
                 </ul>
                 <div class="mt-auto pt-5">
@@ -43,7 +46,6 @@
                 <h2 class="mb-4">Desposte y Estructura Base - Carne Cerdo</h2>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h5 class="card-title mb-3">Control de Kilos y Merma</h5>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label">Total Kilos Cortes</label>
@@ -84,11 +86,16 @@
 
     <script>
         let cortesData = [];
+        let precioCostoGlobal = 10000;
+        let margenGenGlobal = 40;
+
         async function cargarDatos() {
             const res = await fetch('/api/data?tipo=cerdo');
             const data = await res.json();
             if (data.params) {
                 document.getElementById('kilosMediaRes').value = data.params.kilos_media_res || 92;
+                precioCostoGlobal = data.params.precio_media_res || 10000;
+                margenGenGlobal = data.params.margen_deseado || 40;
             }
             cortesData = data.cortes || [];
             calcularDesposte();
@@ -118,13 +125,14 @@
             });
         }
 
-        function actualizarKilos(index, val) {
-            cortesData[index].kilos = parseFloat(val) || 0;
-            calcularDesposte();
-        }
+        function actualizarKilos(index, val) { cortesData[index].kilos = parseFloat(val) || 0; calcularDesposte(); }
 
         async function guardarDesposte() {
-            const params = { kilosMediaRes: document.getElementById('kilosMediaRes').value };
+            const params = {
+                precioMediaRes: precioCostoGlobal,
+                kilosMediaRes: document.getElementById('kilosMediaRes').value,
+                margenDeseadoGen: margenGenGlobal
+            };
             await fetch('/api/save?tipo=cerdo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
